@@ -33,6 +33,5 @@ yarn-error.log*
 next-env.d.ts
 
 # Agent/Template files
-Antigravity Template/
-agent_docs/
-.agent/
+.dev/
+.tmp/
