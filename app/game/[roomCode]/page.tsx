@@ -7,6 +7,7 @@ import LiveLeaderboard from '@/components/LiveLeaderboard'
 import RecentWords from '@/components/RecentWords'
 import CurrentTurn from '@/components/CurrentTurn'
 import SubmitWordForm from '@/components/SubmitWordForm'
+import ConfirmationModal from '@/components/ConfirmationModal'
 
 export default function GamePage() {
     const params = useParams()
@@ -20,6 +21,8 @@ export default function GamePage() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [connectionStatus, setConnectionStatus] = useState('CONNECTING')
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+    const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false)
 
     // Load session from localStorage
     useEffect(() => {
@@ -187,13 +190,19 @@ export default function GamePage() {
     }, [room?.id, router])
 
     const handleLeaveRoom = () => {
+        setIsLeaveModalOpen(true)
+    }
+
+    const confirmLeaveRoom = () => {
         localStorage.removeItem('scrabble_session')
         router.push('/')
     }
 
-    const handleDeleteRoom = async () => {
-        if (!confirm('Are you sure you want to delete this room? This action cannot be undone.')) return
+    const handleDeleteRoom = () => {
+        setIsDeleteModalOpen(true)
+    }
 
+    const confirmDeleteRoom = async () => {
         try {
             const res = await fetch('/api/rooms/delete', {
                 method: 'POST',
@@ -210,6 +219,8 @@ export default function GamePage() {
         } catch (err: any) {
             console.error('Failed to delete room:', err)
             alert(err.message)
+        } finally {
+            setIsDeleteModalOpen(false)
         }
     }
 
@@ -250,6 +261,25 @@ export default function GamePage() {
 
     return (
         <div className="min-h-screen p-2 md:p-4">
+            <ConfirmationModal
+                isOpen={isDeleteModalOpen}
+                title="Delete Room?"
+                message="Are you sure you want to delete this room? This action cannot be undone and all players will be disconnected."
+                onConfirm={confirmDeleteRoom}
+                onCancel={() => setIsDeleteModalOpen(false)}
+                confirmText="Delete Room"
+                isDanger={true}
+            />
+
+            <ConfirmationModal
+                isOpen={isLeaveModalOpen}
+                title="Leave Room?"
+                message="Are you sure you want to leave this game? You can rejoin later using the room code if the game is still active."
+                onConfirm={confirmLeaveRoom}
+                onCancel={() => setIsLeaveModalOpen(false)}
+                confirmText="Leave Game"
+                isDanger={false}
+            />
             {/* Header - Compact on mobile */}
             <header className="mb-3 md:mb-6 flex items-center justify-between">
                 <div>
