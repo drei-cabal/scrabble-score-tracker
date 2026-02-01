@@ -6,20 +6,20 @@ interface CurrentTurnProps {
 
 export default function CurrentTurn({ player }: CurrentTurnProps) {
     return (
-        <div className="relative overflow-hidden rounded-lg p-6 bg-gradient-primary shadow-lg">
+        <div className="relative overflow-hidden rounded-lg p-3 md:p-6 bg-gradient-primary shadow-lg">
             {/* Crown Icon */}
-            <div className="flex justify-center mb-2">
-                <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <div className="flex justify-center mb-1 md:mb-2">
+                <svg className="w-8 h-8 md:w-12 md:h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 4.323V3a1 1 0 011-1z" clipRule="evenodd" />
                 </svg>
             </div>
 
             {/* Text */}
             <div className="text-center">
-                <p className="text-sm font-semibold text-white uppercase tracking-wider mb-2">
+                <p className="text-xs md:text-sm font-semibold text-white uppercase tracking-wider mb-1 md:mb-2">
                     Current Turn
                 </p>
-                <p className="text-3xl font-bold text-white border-b-4 border-white inline-block pb-1">
+                <p className="text-xl md:text-3xl font-bold text-white border-b-2 md:border-b-4 border-white inline-block pb-0.5 md:pb-1">
                     {player.name}
                 </p>
             </div>

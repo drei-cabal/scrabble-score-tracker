@@ -249,15 +249,15 @@ export default function GamePage() {
         currentPlayer?.seat_order === room?.current_turn_index
 
     return (
-        <div className="min-h-screen p-4">
-            {/* Header */}
-            <header className="mb-6 flex items-center justify-between">
+        <div className="min-h-screen p-2 md:p-4">
+            {/* Header - Compact on mobile */}
+            <header className="mb-3 md:mb-6 flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-primary">SCRABBLE</h1>
-                    <p className="text-text-muted">Room: {roomCode}</p>
+                    <h1 className="text-xl md:text-3xl font-bold text-primary">SCRABBLE</h1>
+                    <p className="text-xs md:text-sm text-text-muted">Room: {roomCode}</p>
                 </div>
-                <div className="flex gap-2 items-center">
-                    <div className={`px-3 py-1 rounded-full text-xs font-semibold ${connectionStatus === 'SUBSCRIBED'
+                <div className="flex gap-1 md:gap-2 items-center">
+                    <div className={`px-2 md:px-3 py-1 rounded-full text-xs font-semibold ${connectionStatus === 'SUBSCRIBED'
                         ? 'bg-green-500/20 text-green-400 border border-green-500/50'
                         : 'bg-red-500/20 text-red-400 border border-red-500/50'
                         }`}>
@@ -266,14 +266,14 @@ export default function GamePage() {
                     {isAdmin && (
                         <button
                             onClick={handleDeleteRoom}
-                            className="px-4 py-2 bg-red-900/50 text-red-200 border border-red-800 rounded-lg hover:bg-red-900 transition-all font-semibold text-sm"
+                            className="hidden md:block px-4 py-2 bg-red-900/50 text-red-200 border border-red-800 rounded-lg hover:bg-red-900 transition-all font-semibold text-sm"
                         >
                             Delete Room
                         </button>
                     )}
                     <button
                         onClick={() => window.open(window.location.href, '_blank')}
-                        className="p-2 bg-secondary rounded-lg hover:bg-opacity-80 transition-all"
+                        className="hidden md:block p-2 bg-secondary rounded-lg hover:bg-opacity-80 transition-all"
                         title="Open in new window"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -282,7 +282,7 @@ export default function GamePage() {
                     </button>
                     <button
                         onClick={handleLeaveRoom}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-semibold"
+                        className="px-2 md:px-4 py-1 md:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-semibold text-xs md:text-base"
                     >
                         Leave
                     </button>
@@ -290,9 +290,9 @@ export default function GamePage() {
             </header>
 
             {/* Main Grid */}
-            <div className="flex flex-col lg:grid lg:grid-cols-3 gap-6">
+            <div className="flex flex-col lg:grid lg:grid-cols-3 gap-3 md:gap-6">
                 {/* Left Column - Order 2 on mobile */}
-                <div className="space-y-6 order-2 lg:order-none">
+                <div className="space-y-3 md:space-y-6 order-2 lg:order-none">
                     {/* Show Current Turn FIRST on mobile to give context */}
                     {currentTurnPlayer && <CurrentTurn player={currentTurnPlayer} />}
                     <LiveLeaderboard players={players} />
@@ -304,7 +304,7 @@ export default function GamePage() {
                 </div>
 
                 {/* Right Column - Order 1 on mobile (Input first) */}
-                <div className="space-y-6 order-1 lg:order-none">
+                <div className="space-y-3 md:space-y-6 order-1 lg:order-none">
                     {currentPlayer && (
                         <SubmitWordForm
                             roomCode={roomCode}

@@ -134,83 +134,83 @@ export default function SubmitWordForm({
     const isDisabled = !isMyTurn || isSpectator || loading
 
     return (
-        <div className="card">
-            <h2 className="text-xl font-bold mb-4">Submit Your Word</h2>
+        <div className="card p-3 md:p-6">
+            <h2 className="text-lg md:text-xl font-bold mb-3 md:mb-4">Submit Your Word</h2>
 
             {isSpectator && (
-                <div className="mb-4 p-3 bg-blue-500 bg-opacity-20 border border-blue-500 rounded-lg text-blue-200 text-sm">
+                <div className="mb-3 md:mb-4 p-2 md:p-3 bg-blue-500 bg-opacity-20 border border-blue-500 rounded-lg text-blue-200 text-xs md:text-sm">
                     You are a spectator. Only players can submit words.
                 </div>
             )}
 
             {!isMyTurn && !isSpectator && (
-                <div className="mb-4 p-3 bg-yellow-500 bg-opacity-20 border border-yellow-500 rounded-lg text-yellow-200 text-sm">
+                <div className="mb-3 md:mb-4 p-2 md:p-3 bg-yellow-500 bg-opacity-20 border border-yellow-500 rounded-lg text-yellow-200 text-xs md:text-sm">
                     Wait for your turn to submit a word.
                 </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-2 gap-2 md:gap-4 mb-3 md:mb-4">
                 <div>
-                    <label className="block text-sm font-medium mb-2">Word</label>
+                    <label className="block text-xs md:text-sm font-medium mb-1 md:mb-2">Word</label>
                     <input
                         type="text"
                         placeholder="E.G., TRIPLE"
                         value={word}
                         onChange={(e) => setWord(e.target.value.toUpperCase())}
                         disabled={isDisabled}
-                        className="input-field uppercase"
+                        className="input-field uppercase text-sm md:text-base"
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium mb-2">Points</label>
+                    <label className="block text-xs md:text-sm font-medium mb-1 md:mb-2">Points</label>
                     <input
                         type="number"
                         placeholder="0"
                         value={points}
                         onChange={(e) => setPoints(e.target.value)}
                         disabled={isDisabled}
-                        className="input-field"
+                        className="input-field text-sm md:text-base"
                         min="0"
                     />
                 </div>
             </div>
 
             {error && (
-                <div className="mb-4 p-3 bg-red-500 bg-opacity-20 border border-red-500 rounded-lg text-red-200 text-sm">
+                <div className="mb-3 md:mb-4 p-2 md:p-3 bg-red-500 bg-opacity-20 border border-red-500 rounded-lg text-red-200 text-xs md:text-sm">
                     {error}
                 </div>
             )}
 
             {success && (
-                <div className="mb-4 p-3 bg-green-500 bg-opacity-20 border border-green-500 rounded-lg text-green-200 text-sm">
+                <div className="mb-3 md:mb-4 p-2 md:p-3 bg-green-500 bg-opacity-20 border border-green-500 rounded-lg text-green-200 text-xs md:text-sm">
                     {success}
                 </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="grid grid-cols-2 gap-2 md:gap-3 mb-3 md:mb-4">
                 <button
                     onClick={handleSubmit}
                     disabled={isDisabled}
-                    className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base py-2 md:py-3"
                 >
                     {loading ? 'Submitting...' : 'Submit'}
                 </button>
                 <button
                     onClick={handleClear}
                     disabled={loading}
-                    className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base py-2 md:py-3"
                 >
                     Clear
                 </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2 md:gap-3">
                 <button
                     onClick={handleSkip}
                     disabled={isDisabled}
-                    className="px-4 py-2 bg-secondary rounded-lg hover:bg-opacity-80 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="px-2 md:px-4 py-2 bg-secondary rounded-lg hover:bg-opacity-80 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 md:gap-2 text-xs md:text-base"
                 >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
                     </svg>
                     Skip
@@ -218,7 +218,7 @@ export default function SubmitWordForm({
                 <button
                     onClick={handleSwap}
                     disabled={isDisabled}
-                    className="px-4 py-2 bg-secondary rounded-lg hover:bg-opacity-80 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-2 md:px-4 py-2 bg-secondary rounded-lg hover:bg-opacity-80 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs md:text-base"
                 >
                     Swap Tiles
                 </button>
