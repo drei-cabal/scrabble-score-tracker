@@ -30,7 +30,7 @@
   }
 
   .card {
-    @apply bg-card rounded-lg shadow-md backdrop-blur-sm;
+    @apply bg-card rounded-xl shadow-md backdrop-blur-sm;
   }
 
   .input-field {

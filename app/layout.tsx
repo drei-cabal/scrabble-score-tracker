@@ -7,6 +7,9 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
     title: 'Scrabble Score Tracker',
     description: 'Real-time Scrabble score tracking competition dashboard',
+    icons: {
+        icon: '/icon.png',
+    },
 }
 
 export default function RootLayout({

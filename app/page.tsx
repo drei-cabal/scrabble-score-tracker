@@ -98,8 +98,8 @@ export default function Home() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4">
-            <div className="w-full max-w-md">
+        <div className="min-h-screen flex items-center justify-center p-4 sm:p-6">
+            <div className="w-full max-w-md mx-auto">
                 {/* Logo and Title */}
                 <div className="text-center mb-8">
                     <div className="inline-block mb-4">
@@ -123,8 +123,8 @@ export default function Home() {
                             setError('')
                         }}
                         className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 ${activeTab === 'join'
-                                ? 'bg-gradient-primary text-white shadow-lg'
-                                : 'bg-secondary text-text-muted hover:bg-opacity-80'
+                            ? 'bg-gradient-primary text-white shadow-lg'
+                            : 'bg-secondary text-text-muted hover:bg-opacity-80'
                             }`}
                     >
                         <span className="flex items-center justify-center gap-2">
@@ -140,8 +140,8 @@ export default function Home() {
                             setError('')
                         }}
                         className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 ${activeTab === 'create'
-                                ? 'bg-gradient-primary text-white shadow-lg'
-                                : 'bg-secondary text-text-muted hover:bg-opacity-80'
+                            ? 'bg-gradient-primary text-white shadow-lg'
+                            : 'bg-secondary text-text-muted hover:bg-opacity-80'
                             }`}
                     >
                         <span className="flex items-center justify-center gap-2">
@@ -154,7 +154,7 @@ export default function Home() {
                 </div>
 
                 {/* Content Card */}
-                <div className="card">
+                <div className="card p-6 sm:p-8">
                     {activeTab === 'join' ? (
                         <>
                             <div className="mb-4">

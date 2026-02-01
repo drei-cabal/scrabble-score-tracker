@@ -177,7 +177,6 @@ export default function GamePage() {
                     filter: `id=eq.${room.id}`,
                 },
                 () => {
-                    alert('The room has been deleted by the host.')
                     localStorage.removeItem('scrabble_session')
                     router.push('/')
                 }
