@@ -1,12 +1,34 @@
 'use client'
 
 import { useState } from 'react'
+import WordBuilder from './WordBuilder'
+import ConfirmationModal from './ConfirmationModal'
+import { TileData } from '@/lib/scoring'
+import { v4 as uuidv4 } from 'uuid'
 
 interface SubmitWordFormProps {
     roomCode: string
     playerId: string
     isMyTurn: boolean
     isSpectator: boolean
+    isHost?: boolean
+    onConfirmationRequest?: (config: ConfirmationConfig) => void
+}
+
+export interface ConfirmationConfig {
+    isOpen: boolean
+    title: string
+    message: string
+    action: () => Promise<void>
+    buttonText: string
+    isDanger: boolean
+}
+
+interface TurnWord {
+    id: string
+    word: string
+    points: number
+    tiles: TileData[]
 }
 
 export default function SubmitWordForm({
@@ -14,22 +36,43 @@ export default function SubmitWordForm({
     playerId,
     isMyTurn,
     isSpectator,
+    isHost = false,
+    onConfirmationRequest
 }: SubmitWordFormProps) {
-    const [word, setWord] = useState('')
-    const [points, setPoints] = useState('')
+    const [turnWords, setTurnWords] = useState<TurnWord[]>([])
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [success, setSuccess] = useState('')
+    const [confirmation, setConfirmation] = useState<{
+        isOpen: boolean
+        title: string
+        message: string
+        action: () => Promise<void>
+        buttonText: string
+        isDanger: boolean
+    }>({
+        isOpen: false,
+        title: '',
+        message: '',
+        action: async () => { },
+        buttonText: '',
+        isDanger: false
+    })
 
-    const handleSubmit = async () => {
-        if (!word.trim() || !points) {
-            setError('Please enter both word and points')
-            return
-        }
+    const turnTotal = turnWords.reduce((sum, w) => sum + w.points, 0)
 
-        const pointsNum = parseInt(points)
-        if (isNaN(pointsNum) || pointsNum < 0) {
-            setError('Points must be a valid number')
+    const handleAddWord = (word: string, points: number, tiles: TileData[]) => {
+        setTurnWords([...turnWords, { id: uuidv4(), word, points, tiles }])
+        setError('')
+    }
+
+    const removeWord = (id: string) => {
+        setTurnWords(turnWords.filter(w => w.id !== id))
+    }
+
+    const handleSubmitTurn = async () => {
+        if (turnWords.length === 0) {
+            setError('Add at least one word to end your turn')
             return
         }
 
@@ -38,27 +81,30 @@ export default function SubmitWordForm({
         setSuccess('')
 
         try {
+            // Concatenate words for display, e.g., "WORD1, WORD2"
+            const wordDisplay = turnWords.map(w => w.word).join(', ')
+
             const response = await fetch('/api/moves/submit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     roomCode,
                     playerId,
-                    word: word.trim(),
-                    points: pointsNum,
+                    word: wordDisplay,
+                    points: turnTotal,
+                    details: turnWords // Pass full details if backend wants to store them, currently mostly for scoring
                 }),
             })
 
             const data = await response.json()
 
             if (!response.ok) {
-                throw new Error(data.error || 'Failed to submit word')
+                throw new Error(data.error || 'Failed to submit turn')
             }
 
-            setSuccess('Word submitted!')
-            setWord('')
-            setPoints('')
-            setTimeout(() => setSuccess(''), 2000)
+            // Success feedback removed per user request for cleaner UI
+            // The leaderboard and turn change serves as confirmation
+            setTurnWords([])
         } catch (err: any) {
             setError(err.message)
         } finally {
@@ -66,12 +112,50 @@ export default function SubmitWordForm({
         }
     }
 
-    const handleSkip = async () => {
-        if (!confirm('Are you sure you want to skip your turn?')) return
-
+    const executeUndo = async () => {
         setLoading(true)
         setError('')
         setSuccess('')
+        setConfirmation(prev => ({ ...prev, isOpen: false }))
+
+        try {
+            const response = await fetch('/api/moves/undo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomCode, playerId }),
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to undo')
+            }
+
+            // Dispatch custom event to trigger moves refresh
+            window.dispatchEvent(new CustomEvent('moves-updated'))
+
+        } catch (err: any) {
+            setError(err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleUndoClick = () => {
+        setConfirmation({
+            isOpen: true,
+            title: 'Undo Last Turn?',
+            message: 'Are you sure you want to UNDO the last turn? This will revert points and turn order.',
+            action: executeUndo,
+            buttonText: 'Undo Turn',
+            isDanger: true
+        })
+    }
+
+    const executeSkip = async () => {
+        setLoading(true)
+        setError('')
+        setConfirmation(prev => ({ ...prev, isOpen: false }))
 
         try {
             const response = await fetch('/api/moves/skip', {
@@ -80,14 +164,7 @@ export default function SubmitWordForm({
                 body: JSON.stringify({ roomCode, playerId }),
             })
 
-            const data = await response.json()
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to skip turn')
-            }
-
-            setSuccess('Turn skipped')
-            setTimeout(() => setSuccess(''), 2000)
+            if (!response.ok) throw new Error('Failed to skip')
         } catch (err: any) {
             setError(err.message)
         } finally {
@@ -95,28 +172,27 @@ export default function SubmitWordForm({
         }
     }
 
-    const handleSwap = async () => {
-        if (!confirm('Are you sure you want to swap tiles?')) return
+    const handleSkipClick = () => {
+        setConfirmation({
+            isOpen: true,
+            title: 'Skip Turn?',
+            message: 'Are you sure you want to skip your turn? You will perform no action and score 0 points.',
+            action: executeSkip,
+            buttonText: 'Skip Turn',
+            isDanger: false
+        })
+    }
 
+    const executeSwap = async () => {
         setLoading(true)
-        setError('')
-        setSuccess('')
-
+        setConfirmation(prev => ({ ...prev, isOpen: false }))
         try {
             const response = await fetch('/api/moves/swap', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ roomCode, playerId }),
             })
-
-            const data = await response.json()
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to swap tiles')
-            }
-
-            setSuccess('Tiles swapped')
-            setTimeout(() => setSuccess(''), 2000)
+            if (!response.ok) throw new Error('Failed to swap')
         } catch (err: any) {
             setError(err.message)
         } finally {
@@ -124,105 +200,123 @@ export default function SubmitWordForm({
         }
     }
 
-    const handleClear = () => {
-        setWord('')
-        setPoints('')
-        setError('')
-        setSuccess('')
+    const handleSwapClick = () => {
+        setConfirmation({
+            isOpen: true,
+            title: 'Swap Tiles?',
+            message: 'Are you sure you want to swap your tiles? This counts as your turn and you score 0 points.',
+            action: executeSwap,
+            buttonText: 'Swap Tiles',
+            isDanger: false
+        })
     }
 
     const isDisabled = !isMyTurn || isSpectator || loading
 
     return (
-        <div className="card p-3 md:p-6">
-            <h2 className="text-lg md:text-xl font-bold mb-3 md:mb-4">Submit Your Word</h2>
+        <div className="card p-3 md:p-6 space-y-6 transition-all duration-300 ease-in-out">
+            <ConfirmationModal
+                isOpen={confirmation.isOpen}
+                title={confirmation.title}
+                message={confirmation.message}
+                onConfirm={confirmation.action}
+                onCancel={() => setConfirmation(prev => ({ ...prev, isOpen: false }))}
+                confirmText={confirmation.buttonText}
+                isDanger={confirmation.isDanger}
+            />
 
+            <h2 className="text-lg md:text-xl font-bold">Construct Your Turn</h2>
+
+            {/* Notifications */}
             {isSpectator && (
-                <div className="mb-3 md:mb-4 p-2 md:p-3 bg-blue-500 bg-opacity-20 border border-blue-500 rounded-lg text-blue-200 text-xs md:text-sm">
-                    You are a spectator. Only players can submit words.
+                <div className="p-3 bg-blue-500/20 border border-blue-500 rounded-lg text-blue-200 text-sm transition-all duration-200">
+                    Spectator Mode: You can watch the game.
                 </div>
             )}
-
             {!isMyTurn && !isSpectator && (
-                <div className="mb-3 md:mb-4 p-2 md:p-3 bg-yellow-500 bg-opacity-20 border border-yellow-500 rounded-lg text-yellow-200 text-xs md:text-sm">
-                    Wait for your turn to submit a word.
+                <div className="p-3 bg-yellow-500/20 border border-yellow-500 rounded-lg text-yellow-200 text-sm transition-all duration-200">
+                    Waiting for your turn...
+                </div>
+            )}
+            {error && <div className="p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-200 text-sm transition-all duration-200">{error}</div>}
+            {success && <div className="p-3 bg-green-500/20 border border-green-500 rounded-lg text-green-200 text-sm transition-all duration-200">{success}</div>}
+
+            {/* Word Builder */}
+            {!isSpectator && isMyTurn && (
+                <div className="transition-all duration-300 ease-in-out">
+                    <WordBuilder onAddWord={handleAddWord} disabled={isDisabled} />
                 </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2 md:gap-4 mb-3 md:mb-4">
-                <div>
-                    <label className="block text-xs md:text-sm font-medium mb-1 md:mb-2">Word</label>
-                    <input
-                        type="text"
-                        placeholder="E.G., TRIPLE"
-                        value={word}
-                        onChange={(e) => setWord(e.target.value.toUpperCase())}
+            {/* Turn Buffer */}
+            {turnWords.length > 0 && (
+                <div className="bg-secondary rounded-lg p-4">
+                    <h3 className="text-sm font-semibold mb-3 text-text-muted uppercase">Current Turn</h3>
+                    <div className="space-y-2 mb-4">
+                        {turnWords.map((word) => (
+                            <div key={word.id} className="flex items-center justify-between bg-black/20 p-2 rounded">
+                                <span className="font-bold tracking-wider">{word.word}</span>
+                                <div className="flex items-center gap-3">
+                                    <span className="font-bold text-primary">{word.points} pts</span>
+                                    <button
+                                        onClick={() => removeWord(word.id)}
+                                        className="text-red-400 hover:text-red-300"
+                                        title="Remove word"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-white/10 pt-3 mb-4">
+                        <span className="font-bold">Total Score</span>
+                        <span className="text-xl font-bold text-green-400">{turnTotal} pts</span>
+                    </div>
+
+                    <button
+                        onClick={handleSubmitTurn}
+                        disabled={loading}
+                        className="w-full btn-primary py-3 font-bold text-lg shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all"
+                    >
+                        {loading ? 'Submitting...' : 'END TURN'}
+                    </button>
+                </div>
+            )}
+
+            {/* Secondary Actions (Only clear if buffer empty, or distinct area) */}
+            {turnWords.length === 0 && !isSpectator && isMyTurn && (
+                <div className="grid grid-cols-2 gap-3">
+                    <button
+                        onClick={handleSkipClick}
                         disabled={isDisabled}
-                        className="input-field uppercase text-sm md:text-base"
-                    />
-                </div>
-                <div>
-                    <label className="block text-xs md:text-sm font-medium mb-1 md:mb-2">Points</label>
-                    <input
-                        type="number"
-                        placeholder="0"
-                        value={points}
-                        onChange={(e) => setPoints(e.target.value)}
+                        className="btn-secondary py-3 text-sm"
+                    >
+                        Skip Turn
+                    </button>
+                    <button
+                        onClick={handleSwapClick}
                         disabled={isDisabled}
-                        className="input-field text-sm md:text-base"
-                        min="0"
-                    />
-                </div>
-            </div>
-
-            {error && (
-                <div className="mb-3 md:mb-4 p-2 md:p-3 bg-red-500 bg-opacity-20 border border-red-500 rounded-lg text-red-200 text-xs md:text-sm">
-                    {error}
+                        className="btn-secondary py-3 text-sm"
+                    >
+                        Swap Tiles
+                    </button>
                 </div>
             )}
 
-            {success && (
-                <div className="mb-3 md:mb-4 p-2 md:p-3 bg-green-500 bg-opacity-20 border border-green-500 rounded-lg text-green-200 text-xs md:text-sm">
-                    {success}
+            {/* Host Actions */}
+            {isHost && (
+                <div className="pt-4 border-t border-white/10">
+                    <button
+                        onClick={handleUndoClick}
+                        disabled={loading}
+                        className="w-full py-2 bg-red-900/40 text-red-200 border border-red-900/50 rounded-lg hover:bg-red-900/60 transition-all text-xs uppercase font-bold tracking-wider"
+                    >
+                        Undo Last Move (Host Only)
+                    </button>
                 </div>
             )}
-
-            <div className="grid grid-cols-2 gap-2 md:gap-3 mb-3 md:mb-4">
-                <button
-                    onClick={handleSubmit}
-                    disabled={isDisabled}
-                    className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base py-2 md:py-3"
-                >
-                    {loading ? 'Submitting...' : 'Submit'}
-                </button>
-                <button
-                    onClick={handleClear}
-                    disabled={loading}
-                    className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base py-2 md:py-3"
-                >
-                    Clear
-                </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 md:gap-3">
-                <button
-                    onClick={handleSkip}
-                    disabled={isDisabled}
-                    className="px-2 md:px-4 py-2 bg-secondary rounded-lg hover:bg-opacity-80 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 md:gap-2 text-xs md:text-base"
-                >
-                    <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                    </svg>
-                    Skip
-                </button>
-                <button
-                    onClick={handleSwap}
-                    disabled={isDisabled}
-                    className="px-2 md:px-4 py-2 bg-secondary rounded-lg hover:bg-opacity-80 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-xs md:text-base"
-                >
-                    Swap Tiles
-                </button>
-            </div>
         </div>
     )
 }

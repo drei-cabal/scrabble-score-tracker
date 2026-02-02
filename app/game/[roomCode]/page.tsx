@@ -132,14 +132,27 @@ export default function GamePage() {
             .on(
                 'postgres_changes',
                 {
-                    event: 'INSERT',
+                    event: '*',
                     schema: 'public',
                     table: 'moves',
                     filter: `room_code=eq.${roomCode}`,
                 },
                 (payload) => {
-                    console.log('New move:', payload)
-                    setMoves((prev) => [payload.new as Move, ...prev].slice(0, 20))
+                    console.log('Move update:', payload)
+                    if (payload.eventType === 'INSERT') {
+                        setMoves((prev) => [payload.new as Move, ...prev].slice(0, 20))
+                    } else if (payload.eventType === 'DELETE') {
+                        // Reload moves since DELETE payload might not have full old record
+                        supabase
+                            .from('moves')
+                            .select('*')
+                            .eq('room_code', roomCode)
+                            .order('created_at', { ascending: false })
+                            .limit(20)
+                            .then(({ data }) => {
+                                if (data) setMoves(data)
+                            })
+                    }
 
                     // Also refresh room state to ensure turn index is synced
                     supabase
@@ -157,8 +170,40 @@ export default function GamePage() {
                 setConnectionStatus(status)
             })
 
+        // Listen for manual refresh events (e.g., after undo)
+        const handleMovesUpdate = () => {
+            console.log('Manual moves refresh triggered')
+            supabase
+                .from('moves')
+                .select('*')
+                .eq('room_code', roomCode)
+                .order('created_at', { ascending: false })
+                .limit(20)
+                .then(({ data }) => {
+                    if (data) setMoves(data)
+                })
+        }
+
+        window.addEventListener('moves-updated', handleMovesUpdate)
+
+        // Polling fallback: refresh moves every 3 seconds to ensure sync
+        // This ensures all clients stay updated even if realtime events fail
+        const pollInterval = setInterval(() => {
+            supabase
+                .from('moves')
+                .select('*')
+                .eq('room_code', roomCode)
+                .order('created_at', { ascending: false })
+                .limit(20)
+                .then(({ data }) => {
+                    if (data) setMoves(data)
+                })
+        }, 3000)
+
         return () => {
             supabase.removeChannel(channel)
+            window.removeEventListener('moves-updated', handleMovesUpdate)
+            clearInterval(pollInterval)
         }
     }, [roomCode])
 
@@ -344,6 +389,7 @@ export default function GamePage() {
                             playerId={currentPlayer.id}
                             isMyTurn={isMyTurn}
                             isSpectator={currentPlayer.role === 'spectator'}
+                            isHost={isAdmin}
                         />
                     )}
                 </div>

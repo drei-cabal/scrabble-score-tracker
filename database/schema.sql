@@ -54,6 +54,7 @@ DROP POLICY IF EXISTS "Allow public insert on players" ON players;
 DROP POLICY IF EXISTS "Allow public insert on moves" ON moves;
 DROP POLICY IF EXISTS "Allow public update on rooms" ON rooms;
 DROP POLICY IF EXISTS "Allow public update on players" ON players;
+DROP POLICY IF EXISTS "Allow public delete on moves" ON moves;
 
 -- Create RLS policies for public access (no auth required)
 CREATE POLICY "Allow public read on rooms" ON rooms FOR SELECT USING (true);
@@ -66,6 +67,8 @@ CREATE POLICY "Allow public insert on moves" ON moves FOR INSERT WITH CHECK (tru
 
 CREATE POLICY "Allow public update on rooms" ON rooms FOR UPDATE USING (true);
 CREATE POLICY "Allow public update on players" ON players FOR UPDATE USING (true);
+
+CREATE POLICY "Allow public delete on moves" ON moves FOR DELETE USING (true);
 
 -- Enable Realtime
 -- Note: You must also enable Realtime for these tables in the Supabase Dashboard
