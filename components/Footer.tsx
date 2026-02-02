@@ -1,23 +1,14 @@
 export default function Footer() {
     return (
-        <footer className="w-full bg-card border-t border-white/10 mt-auto">
-            <div className="max-w-7xl mx-auto px-4 py-4 sm:py-6">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center sm:text-left">
-                    {/* Left: Copyright */}
-                    <div className="text-text-muted text-sm order-2 sm:order-1">
-                        © 2026 Scrabble Score Tracker
-                    </div>
-
-                    {/* Center: Tagline */}
-                    <div className="text-center text-sm font-medium text-gradient order-1 sm:order-2">
-                        "May the best wordsmith win."
-                    </div>
-
-                    {/* Right: Author */}
-                    <div className="text-text-muted text-sm text-center sm:text-right order-3">
-                        by <span className="text-primary font-semibold">C.A.C</span>
-                    </div>
-                </div>
+        <footer className="w-full mt-auto py-6">
+            <div className="max-w-7xl mx-auto px-4 text-center">
+                <p className="text-[10px] sm:text-xs text-white/30 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-3">
+                    <span>© 2026 Scrabble Score Tracker</span>
+                    <span className="hidden sm:inline">•</span>
+                    <span>"May the best wordsmith win."</span>
+                    <span className="hidden sm:inline">•</span>
+                    <span>by C.A.C</span>
+                </p>
             </div>
         </footer>
     )
