@@ -1,6 +1,6 @@
 export default function Footer() {
     return (
-        <footer className="w-full mt-auto py-6">
+        <footer className="w-full mt-8 py-3">
             <div className="max-w-7xl mx-auto px-4 text-center">
                 <p className="text-[10px] sm:text-xs text-white/30 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-3">
                     <span>© 2026 Scrabble Score Tracker</span>
