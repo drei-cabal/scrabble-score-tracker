@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import AboutModal from '@/components/AboutModal'
+import HowToUseModal from '@/components/HowToUseModal'
 
 export default function Home() {
     const [activeTab, setActiveTab] = useState<'join' | 'create'>('join')
@@ -10,6 +12,8 @@ export default function Home() {
     const [joinAsSpectator, setJoinAsSpectator] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+    const [showAbout, setShowAbout] = useState(false)
+    const [showHowToUse, setShowHowToUse] = useState(false)
     const router = useRouter()
 
     const handleCreateRoom = async () => {
@@ -113,6 +117,23 @@ export default function Home() {
                     </div>
                     <h1 className="text-4xl font-bold mb-2">SCRABBLE</h1>
                     <p className="text-text-muted">Competition Dashboard</p>
+
+                    {/* Text Links */}
+                    <div className="flex items-center justify-center gap-4 mt-4">
+                        <button
+                            onClick={() => setShowAbout(true)}
+                            className="text-sm text-white/60 hover:text-primary transition-colors underline-offset-4 hover:underline cursor-pointer"
+                        >
+                            About
+                        </button>
+                        <span className="text-white/30">•</span>
+                        <button
+                            onClick={() => setShowHowToUse(true)}
+                            className="text-sm text-white/60 hover:text-primary transition-colors underline-offset-4 hover:underline cursor-pointer"
+                        >
+                            How To Use
+                        </button>
+                    </div>
                 </div>
 
                 {/* Tab Switcher */}
@@ -251,6 +272,10 @@ export default function Home() {
                     )}
                 </div>
             </div>
+
+            {/* Modals */}
+            <AboutModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
+            <HowToUseModal isOpen={showHowToUse} onClose={() => setShowHowToUse(false)} />
         </div>
     )
 }

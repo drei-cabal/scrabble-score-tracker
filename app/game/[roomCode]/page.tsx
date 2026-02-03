@@ -8,6 +8,8 @@ import RecentWords from '@/components/RecentWords'
 import CurrentTurn from '@/components/CurrentTurn'
 import SubmitWordForm from '@/components/SubmitWordForm'
 import ConfirmationModal from '@/components/ConfirmationModal'
+import AboutModal from '@/components/AboutModal'
+import HowToUseModal from '@/components/HowToUseModal'
 
 export default function GamePage() {
     const params = useParams()
@@ -23,6 +25,8 @@ export default function GamePage() {
     const [connectionStatus, setConnectionStatus] = useState('CONNECTING')
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
     const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false)
+    const [showAbout, setShowAbout] = useState(false)
+    const [showHowToUse, setShowHowToUse] = useState(false)
 
     // Load session from localStorage
     useEffect(() => {
@@ -325,44 +329,54 @@ export default function GamePage() {
                 isDanger={false}
             />
             {/* Header - Compact on mobile */}
-            <header className="mb-3 md:mb-6 flex items-center justify-between">
-                <div>
-                    <h1 className="text-xl md:text-3xl font-bold text-primary">SCRABBLE</h1>
-                    <p className="text-xs md:text-sm text-text-muted">Room: {roomCode}</p>
-                </div>
-                <div className="flex gap-1 md:gap-2 items-center">
-                    <div className={`px-2 md:px-3 py-1 rounded-full text-xs font-semibold ${connectionStatus === 'SUBSCRIBED'
-                        ? 'bg-green-500/20 text-green-400 border border-green-500/50'
-                        : 'bg-red-500/20 text-red-400 border border-red-500/50'
-                        }`}>
-                        {connectionStatus === 'SUBSCRIBED' ? '● Live' : '○ Connecting...'}
+            <header className="mb-3 md:mb-6">
+                <div className="flex items-center justify-between mb-2">
+                    <div>
+                        <h1 className="text-xl md:text-3xl font-bold text-primary">SCRABBLE</h1>
+                        <p className="text-xs md:text-sm text-text-muted">Room: {roomCode}</p>
                     </div>
-                    {isAdmin && (
+                    <div className="flex gap-1 md:gap-2 items-center">
+                        <div className={`px-2 md:px-3 py-1 rounded-full text-xs font-semibold ${connectionStatus === 'SUBSCRIBED'
+                            ? 'bg-green-500/20 text-green-400 border border-green-500/50'
+                            : 'bg-red-500/20 text-red-400 border border-red-500/50'
+                            }`}>
+                            {connectionStatus === 'SUBSCRIBED' ? '● Live' : '○ Connecting...'}
+                        </div>
+                        {isAdmin && (
+                            <button
+                                onClick={handleDeleteRoom}
+                                className="px-2 md:px-4 py-1 md:py-2 bg-red-900/50 text-red-200 border border-red-800 rounded-lg hover:bg-red-900 transition-all font-semibold text-xs md:text-sm flex items-center gap-1"
+                                title="Delete Room"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                <span className="hidden md:inline">Delete Room</span>
+                            </button>
+                        )}
                         <button
-                            onClick={handleDeleteRoom}
-                            className="px-2 md:px-4 py-1 md:py-2 bg-red-900/50 text-red-200 border border-red-800 rounded-lg hover:bg-red-900 transition-all font-semibold text-xs md:text-sm flex items-center gap-1"
-                            title="Delete Room"
+                            onClick={handleLeaveRoom}
+                            className="px-2 md:px-4 py-1 md:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-semibold text-xs md:text-base"
                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            <span className="hidden md:inline">Delete Room</span>
+                            Leave
                         </button>
-                    )}
+                    </div>
+                </div>
+
+                {/* Help Links - Below room info */}
+                <div className="flex items-center gap-3 text-xs">
                     <button
-                        onClick={() => window.open(window.location.href, '_blank')}
-                        className="hidden md:block p-2 bg-secondary rounded-lg hover:bg-opacity-80 transition-all"
-                        title="Open in new window"
+                        onClick={() => setShowAbout(true)}
+                        className="text-white/50 hover:text-primary transition-colors underline-offset-2 hover:underline"
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
+                        About
                     </button>
+                    <span className="text-white/30">•</span>
                     <button
-                        onClick={handleLeaveRoom}
-                        className="px-2 md:px-4 py-1 md:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-semibold text-xs md:text-base"
+                        onClick={() => setShowHowToUse(true)}
+                        className="text-white/50 hover:text-primary transition-colors underline-offset-2 hover:underline"
                     >
-                        Leave
+                        How To Use
                     </button>
                 </div>
             </header>
@@ -394,6 +408,10 @@ export default function GamePage() {
                     )}
                 </div>
             </div>
+
+            {/* Modals */}
+            <AboutModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
+            <HowToUseModal isOpen={showHowToUse} onClose={() => setShowHowToUse(false)} />
         </div>
     )
 }
