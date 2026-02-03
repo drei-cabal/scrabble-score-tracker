@@ -71,9 +71,11 @@ export default function WordBuilder({ onAddWord, disabled }: WordBuilderProps) {
     }
 
     const handleAdd = () => {
-        if (!inputText.trim()) return
+        const text = inputText.trim()
+        if (!text || text.length < 2) return // Min length 2 check
+
         const score = calculateWordScore(tiles, wordMultipliers)
-        onAddWord(inputText.trim().toUpperCase(), score, tiles)
+        onAddWord(text.toUpperCase(), score, tiles)
 
         // Reset
         setInputText('')
@@ -82,16 +84,26 @@ export default function WordBuilder({ onAddWord, disabled }: WordBuilderProps) {
     }
 
     const currentScore = calculateWordScore(tiles, wordMultipliers)
+    const isLengthValid = inputText.trim().length >= 2
 
     return (
         <div className="space-y-4">
             {/* Input */}
             <div>
-                <label className="block text-sm font-medium mb-1">Construct Word</label>
+                <div className="flex justify-between items-center mb-1">
+                    <label className="text-sm font-medium">Construct Word</label>
+                    <span className={`text-xs ${inputText.length === 7 ? 'text-red-400 font-bold' : 'text-text-muted'}`}>
+                        {inputText.length}/7
+                    </span>
+                </div>
                 <input
                     type="text"
                     value={inputText}
-                    onChange={(e) => setInputText(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
+                    onChange={(e) => {
+                        const val = e.target.value.toUpperCase().replace(/[^A-Z]/g, '')
+                        if (val.length <= 7) setInputText(val)
+                    }}
+                    maxLength={7}
                     placeholder="TYPE HERE..."
                     className="input-field uppercase text-lg tracking-widest font-bold"
                     disabled={disabled}
@@ -149,8 +161,8 @@ export default function WordBuilder({ onAddWord, disabled }: WordBuilderProps) {
                             multiplier: tiles[selectedTileIndex].multiplier === '1L' ? '2L' : '1L'
                         })}
                         className={`p-2 rounded text-xs font-bold transition-all ${tiles[selectedTileIndex].multiplier === '2L'
-                                ? 'bg-blue-400 text-white shadow-inner'
-                                : 'bg-card hover:bg-opacity-80'
+                            ? 'bg-blue-400 text-white shadow-inner'
+                            : 'bg-card hover:bg-opacity-80'
                             }`}
                     >
                         DOUBLE LETTER
@@ -160,8 +172,8 @@ export default function WordBuilder({ onAddWord, disabled }: WordBuilderProps) {
                             multiplier: tiles[selectedTileIndex].multiplier === '1L' ? '3L' : '1L'
                         })}
                         className={`p-2 rounded text-xs font-bold transition-all ${tiles[selectedTileIndex].multiplier === '3L'
-                                ? 'bg-blue-600 text-white shadow-inner'
-                                : 'bg-card hover:bg-opacity-80'
+                            ? 'bg-blue-600 text-white shadow-inner'
+                            : 'bg-card hover:bg-opacity-80'
                             }`}
                     >
                         TRIPLE LETTER
@@ -171,8 +183,8 @@ export default function WordBuilder({ onAddWord, disabled }: WordBuilderProps) {
                             isBlank: !tiles[selectedTileIndex].isBlank
                         })}
                         className={`p-2 rounded text-xs font-bold transition-all ${tiles[selectedTileIndex].isBlank
-                                ? 'bg-gray-500 text-white shadow-inner'
-                                : 'bg-[#E8D0B3] text-[#4A3F35] hover:opacity-80'
+                            ? 'bg-gray-500 text-white shadow-inner'
+                            : 'bg-[#E8D0B3] text-[#4A3F35] hover:opacity-80'
                             }`}
                     >
                         BLANK TILE
@@ -186,8 +198,8 @@ export default function WordBuilder({ onAddWord, disabled }: WordBuilderProps) {
                     <button
                         onClick={() => toggleWordMultiplier('2W')}
                         className={`p-3 rounded-lg font-bold text-sm transition-all border-2 ${wordMultipliers.includes('2W')
-                                ? 'bg-red-300 border-red-500 text-red-900 shadow-inner'
-                                : 'bg-card border-transparent hover:bg-red-500/10 text-red-300'
+                            ? 'bg-red-300 border-red-500 text-red-900 shadow-inner'
+                            : 'bg-card border-transparent hover:bg-red-500/10 text-red-300'
                             }`}
                     >
                         DOUBLE WORD
@@ -195,8 +207,8 @@ export default function WordBuilder({ onAddWord, disabled }: WordBuilderProps) {
                     <button
                         onClick={() => toggleWordMultiplier('3W')}
                         className={`p-3 rounded-lg font-bold text-sm transition-all border-2 ${wordMultipliers.includes('3W')
-                                ? 'bg-red-500 border-red-700 text-white shadow-inner'
-                                : 'bg-card border-transparent hover:bg-red-500/10 text-red-500'
+                            ? 'bg-red-500 border-red-700 text-white shadow-inner'
+                            : 'bg-card border-transparent hover:bg-red-500/10 text-red-500'
                             }`}
                     >
                         TRIPLE WORD
@@ -213,8 +225,8 @@ export default function WordBuilder({ onAddWord, disabled }: WordBuilderProps) {
                     </div>
                     <button
                         onClick={handleAdd}
-                        disabled={disabled || !inputText}
-                        className="flex-[2] btn-primary py-3 font-bold flex items-center justify-center gap-2"
+                        disabled={disabled || !isLengthValid}
+                        className="flex-[2] btn-primary py-3 font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
