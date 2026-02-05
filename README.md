@@ -5,12 +5,17 @@ A real-time Scrabble score tracking application built with Next.js, Tailwind CSS
 ## Features
 
 - ✨ **Real-time Synchronization**: All players see updates instantly via Supabase Realtime
-- 🎮 **Turn Management**: Automatic turn rotation with visual indicators
+- 🎮 **Dual Game Modes**: Multi-device (remote play) and Single-device (pass-and-play)
+- ⏱️ **Turn Timer**: Optional countdown with auto-skip functionality
+- ⏸️ **Pause/Resume**: Host can pause the game at any time
 - 👥 **Player & Spectator Modes**: Supports up to 4 players + unlimited spectators
 - 💾 **Crash Recovery**: Sessions persist in localStorage - reload and continue playing
+- 📴 **Offline Support**: Queue moves when offline, auto-sync when reconnected
 - 🏆 **Live Leaderboard**: Auto-sorting scoreboard with rank indicators
 - 📊 **Move History**: Track all words, skips, and tile swaps
-- 🎨 **Premium UI**: Modern design matching the reference mockups
+- ↩️ **Undo Functionality**: Host can undo the last move
+- 📱 **Mobile Optimized**: Responsive design for all screen sizes
+- 🎨 **Premium UI**: Modern dark theme with smooth animations
 
 ## Tech Stack
 
@@ -78,7 +83,21 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
    - ✅ `players`
    - ✅ `moves`
 
-### 7. Run the Development Server
+### 7. Run Pause Feature Migration (IMPORTANT)
+
+1. In Supabase dashboard, go to **SQL Editor**
+2. Open the file `database/migration_add_pause.sql` from this project
+3. Copy the SQL content
+4. Paste it into the Supabase SQL Editor
+5. Click **Run** to add the pause feature
+
+**SQL to run:**
+```sql
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS is_paused BOOLEAN DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_rooms_is_paused ON rooms(is_paused);
+```
+
+### 8. Run the Development Server
 
 ```bash
 npm run dev

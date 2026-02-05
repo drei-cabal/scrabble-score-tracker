@@ -1,24 +1,66 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AboutModal from '@/components/AboutModal'
 import HowToUseModal from '@/components/HowToUseModal'
 
 export default function Home() {
-    const [activeTab, setActiveTab] = useState<'join' | 'create'>('join')
+    const [activeTab, setActiveTab] = useState<'join' | 'create' | 'reconnect'>('join')
     const [roomCode, setRoomCode] = useState('')
+    const [reconnectCode, setReconnectCode] = useState('')
     const [playerName, setPlayerName] = useState('')
     const [joinAsSpectator, setJoinAsSpectator] = useState(false)
+
+    // Game mode and timer settings
+    const [gameMode, setGameMode] = useState<'multi-device' | 'single-device'>('multi-device')
+    const [turnTimerEnabled, setTurnTimerEnabled] = useState(false)
+    const [turnTimerSeconds, setTurnTimerSeconds] = useState(60)
+    const [playerNames, setPlayerNames] = useState(['', ''])
+
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [showAbout, setShowAbout] = useState(false)
     const [showHowToUse, setShowHowToUse] = useState(false)
+    const [activeSession, setActiveSession] = useState<any>(null)
     const router = useRouter()
 
-    const handleCreateRoom = async () => {
-        if (!playerName.trim()) {
-            setError('Please enter your name')
+    useEffect(() => {
+        const checkSession = () => {
+            try {
+                const savedSession = localStorage.getItem('scrabble_session')
+                if (savedSession) {
+                    const parsed = JSON.parse(savedSession)
+                    if (parsed && parsed.roomCode) {
+                        console.log('Restoring active session:', parsed)
+                        setActiveSession(parsed)
+                    }
+                }
+            } catch (e) {
+                console.error("Invalid session", e)
+                localStorage.removeItem('scrabble_session')
+            }
+        }
+
+        checkSession()
+    }, [])
+
+    const handleReconnect = () => {
+        if (activeSession?.roomCode) {
+            router.push(`/game/${activeSession.roomCode}`)
+        }
+    }
+
+    const handleReconnectToRoom = async () => {
+        const trimmedCode = reconnectCode.trim().toUpperCase()
+
+        if (!trimmedCode) {
+            setError('Please enter a room code')
+            return
+        }
+
+        if (trimmedCode.length !== 5) {
+            setError('Room code must be 5 characters')
             return
         }
 
@@ -26,10 +68,64 @@ export default function Home() {
         setError('')
 
         try {
+            // Just navigate directly to the game page
+            // The game page will handle auto-recovery for single-device rooms
+            router.push(`/game/${trimmedCode}`)
+        } catch (err: any) {
+            setError(err.message || 'Failed to reconnect')
+            setLoading(false)
+        }
+    }
+
+    const handleCreateRoom = async () => {
+        // Validation based on game mode
+        if (gameMode === 'single-device') {
+            // Validate player names
+            const validNames = playerNames.filter(name => name.trim())
+            if (validNames.length < 2) {
+                setError('Please enter at least 2 player names for single-device mode')
+                return
+            }
+            // Check for duplicate names
+            const uniqueNames = new Set(validNames.map(n => n.trim().toLowerCase()))
+            if (uniqueNames.size !== validNames.length) {
+                setError('Player names must be unique')
+                return
+            }
+        } else {
+            // Multi-device mode
+            if (!playerName.trim()) {
+                setError('Please enter your name')
+                return
+            }
+        }
+
+        // Validate timer settings
+        if (turnTimerEnabled && (turnTimerSeconds < 10 || turnTimerSeconds > 300)) {
+            setError('Timer must be between 10 and 300 seconds')
+            return
+        }
+
+        setLoading(true)
+        setError('')
+
+        try {
+            const requestBody: any = {
+                gameMode,
+                turnTimerEnabled,
+                turnTimerSeconds,
+            }
+
+            if (gameMode === 'single-device') {
+                requestBody.playerNames = playerNames.filter(name => name.trim())
+            } else {
+                requestBody.playerName = playerName.trim()
+            }
+
             const response = await fetch('/api/rooms/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ playerName: playerName.trim() }),
+                body: JSON.stringify(requestBody),
             })
 
             const data = await response.json()
@@ -39,11 +135,21 @@ export default function Home() {
             }
 
             // Save session to localStorage
-            localStorage.setItem('scrabble_session', JSON.stringify({
-                playerId: data.playerId,
+            const session: any = {
                 roomCode: data.roomCode,
-                playerName: playerName.trim(),
-            }))
+                gameMode: data.gameMode,
+            }
+
+            if (gameMode === 'single-device') {
+                session.playerIds = data.playerIds
+                session.hostPlayerId = data.hostPlayerId
+                session.isSingleDevice = true
+            } else {
+                session.playerId = data.playerId
+                session.playerName = playerName.trim()
+            }
+
+            localStorage.setItem('scrabble_session', JSON.stringify(session))
 
             // Navigate to game room
             router.push(`/game/${data.roomCode}`)
@@ -60,8 +166,8 @@ export default function Home() {
             return
         }
 
-        if (!roomCode.trim() || roomCode.trim().length !== 4) {
-            setError('Please enter a valid 4-character room code')
+        if (!roomCode.trim() || roomCode.trim().length !== 5) {
+            setError('Please enter a valid 5-character room code')
             return
         }
 
@@ -86,11 +192,19 @@ export default function Home() {
             }
 
             // Save session to localStorage
-            localStorage.setItem('scrabble_session', JSON.stringify({
+            const sessionData: any = {
                 playerId: data.playerId,
                 roomCode: roomCode.trim().toUpperCase(),
                 playerName: playerName.trim(),
-            }))
+            }
+
+            if (data.isSingleDevice) {
+                sessionData.isSingleDevice = true
+                sessionData.hostPlayerId = data.hostPlayerId
+                sessionData.gameMode = 'single-device'
+            }
+
+            localStorage.setItem('scrabble_session', JSON.stringify(sessionData))
 
             // Navigate to game room
             router.push(`/game/${roomCode.trim().toUpperCase()}`)
@@ -157,6 +271,23 @@ export default function Home() {
                     </button>
                     <button
                         onClick={() => {
+                            setActiveTab('reconnect')
+                            setError('')
+                        }}
+                        className={`flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 ${activeTab === 'reconnect'
+                            ? 'bg-gradient-primary text-white shadow-lg'
+                            : 'bg-secondary text-text-muted hover:bg-opacity-80'
+                            }`}
+                    >
+                        <span className="flex items-center justify-center gap-2">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Reconnect
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => {
                             setActiveTab('create')
                             setError('')
                         }}
@@ -174,18 +305,50 @@ export default function Home() {
                     </button>
                 </div>
 
+                {/* Reconnect Button */}
+                {activeSession && activeSession.roomCode && (
+                    <div className="mb-6 animate-in fade-in zoom-in-95 duration-300">
+                        <button
+                            onClick={handleReconnect}
+                            className="w-full p-4 bg-secondary border border-primary/50 rounded-xl hover:bg-primary/10 transition-all group relative overflow-hidden shadow-lg text-left"
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary border border-primary/30 shrink-0">
+                                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-lg text-white group-hover:text-primary transition-colors">Rejoin Active Game</div>
+                                        <div className="text-sm text-text-muted flex items-center flex-wrap gap-2">
+                                            <span className={`w-2 h-2 rounded-full ${activeSession.isSingleDevice ? 'bg-blue-400' : 'bg-green-400'}`}></span>
+                                            {activeSession.isSingleDevice ? 'Single-Device' : 'Multi-Device'}
+                                            <span className="opacity-50 hidden sm:inline">•</span>
+                                            <span className="whitespace-nowrap">Room: <span className="font-mono text-white tracking-wider">{activeSession.roomCode}</span></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="hidden sm:block bg-primary text-black px-4 py-2 rounded-lg text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity translate-x-4 group-hover:translate-x-0 transform">
+                                    Play &rarr;
+                                </div>
+                            </div>
+                        </button>
+                    </div>
+                )}
+
                 {/* Content Card */}
                 <div className="card p-6 sm:p-8">
-                    {activeTab === 'join' ? (
+                    {activeTab === 'join' && (
                         <>
                             <div className="mb-4">
                                 <label className="block text-sm font-medium mb-2">Room Code</label>
                                 <input
                                     type="text"
-                                    placeholder="E.G., ABC123"
+                                    placeholder="E.G., ABCDE"
                                     value={roomCode}
                                     onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                                    maxLength={4}
+                                    maxLength={5}
                                     className="input-field uppercase"
                                 />
                             </div>
@@ -231,25 +394,167 @@ export default function Home() {
                                 Ask your host for the room code to join an active game.
                             </p>
                         </>
-                    ) : (
+                    )}
+
+                    {activeTab === 'reconnect' && (
                         <>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium mb-2">Your Name</label>
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium mb-2">Room Code</label>
                                 <input
                                     type="text"
-                                    placeholder="e.g., Alex"
-                                    value={playerName}
-                                    onChange={(e) => setPlayerName(e.target.value)}
-                                    className="input-field"
+                                    placeholder="E.G., ABCDE"
+                                    value={reconnectCode}
+                                    onChange={(e) => setReconnectCode(e.target.value.toUpperCase())}
+                                    maxLength={5}
+                                    className="input-field uppercase text-center text-2xl tracking-widest font-mono"
                                 />
                             </div>
 
-                            <div className="mb-6 bg-secondary p-4 rounded-lg">
-                                <p className="text-sm font-medium mb-1">Room Code will be generated:</p>
-                                <p className="text-text-muted text-sm">
-                                    You'll receive a unique room code to share with other players.
-                                </p>
+                            {error && (
+                                <div className="mb-4 p-3 bg-red-500 bg-opacity-20 border border-red-500 rounded-lg text-red-200 text-sm">
+                                    {error}
+                                </div>
+                            )}
+
+                            <button
+                                onClick={handleReconnectToRoom}
+                                disabled={loading}
+                                className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? 'Reconnecting...' : 'Reconnect to Game'}
+                            </button>
+
+                            <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                                <div className="flex items-start gap-3">
+                                    <svg className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <div className="text-sm text-blue-200">
+                                        <p className="font-semibold mb-1">Device Switch Recovery</p>
+                                        <p className="text-blue-300/80">
+                                            Use this to rejoin a Single-Device game from a different device.
+                                            Just enter the 5-character room code and you'll be back in the game!
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
+                        </>
+                    )}
+
+                    {activeTab === 'create' && (
+                        <>
+                            {/* Game Mode Selection */}
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium mb-3">Game Mode</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setGameMode('multi-device')}
+                                        className={`p-4 rounded-lg border-2 transition-all ${gameMode === 'multi-device'
+                                            ? 'border-primary bg-primary/20'
+                                            : 'border-secondary bg-secondary hover:border-primary/50'
+                                            }`}
+                                    >
+                                        <div className="text-2xl mb-2">🌐</div>
+                                        <div className="font-semibold text-sm">Multi-Device</div>
+                                        <div className="text-xs text-text-muted mt-1">Each player uses their own device</div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setGameMode('single-device')}
+                                        className={`p-4 rounded-lg border-2 transition-all ${gameMode === 'single-device'
+                                            ? 'border-primary bg-primary/20'
+                                            : 'border-secondary bg-secondary hover:border-primary/50'
+                                            }`}
+                                    >
+                                        <div className="text-2xl mb-2">📱</div>
+                                        <div className="font-semibold text-sm">Single-Device</div>
+                                        <div className="text-xs text-text-muted mt-1">Pass one device between players</div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Turn Timer Settings */}
+                            <div className="mb-6 bg-secondary p-4 rounded-lg">
+                                <label className="flex items-center gap-3 cursor-pointer mb-3">
+                                    <input
+                                        type="checkbox"
+                                        checked={turnTimerEnabled}
+                                        onChange={(e) => setTurnTimerEnabled(e.target.checked)}
+                                        className="w-5 h-5 accent-primary"
+                                    />
+                                    <span className="text-sm font-medium">Enable Turn Timer</span>
+                                </label>
+
+                                {turnTimerEnabled && (
+                                    <div>
+                                        <label className="block text-sm mb-2">Seconds per Turn</label>
+                                        <input
+                                            type="number"
+                                            min={10}
+                                            max={300}
+                                            value={turnTimerSeconds}
+                                            onChange={(e) => setTurnTimerSeconds(parseInt(e.target.value) || 60)}
+                                            className="input-field w-full"
+                                        />
+                                        <p className="text-xs text-text-muted mt-1">Between 10 and 300 seconds</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Player Name Input (Multi-Device) or Player Names (Single-Device) */}
+                            {gameMode === 'multi-device' ? (
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium mb-2">Your Name (Host)</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g., Alex"
+                                        value={playerName}
+                                        onChange={(e) => setPlayerName(e.target.value)}
+                                        className="input-field"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium mb-2">Player Names (2-4 players)</label>
+                                    {playerNames.map((name, index) => (
+                                        <div key={index} className="mb-2 flex gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder={`Player ${index + 1}`}
+                                                value={name}
+                                                onChange={(e) => {
+                                                    const newNames = [...playerNames]
+                                                    newNames[index] = e.target.value
+                                                    setPlayerNames(newNames)
+                                                }}
+                                                className="input-field flex-1"
+                                            />
+                                            {index >= 2 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newNames = playerNames.filter((_, i) => i !== index)
+                                                        setPlayerNames(newNames)
+                                                    }}
+                                                    className="px-3 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30"
+                                                >
+                                                    ✕
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {playerNames.length < 4 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setPlayerNames([...playerNames, ''])}
+                                            className="text-sm text-primary hover:underline"
+                                        >
+                                            + Add Player
+                                        </button>
+                                    )}
+                                </div>
+                            )}
 
                             {error && (
                                 <div className="mb-4 p-3 bg-red-500 bg-opacity-20 border border-red-500 rounded-lg text-red-200 text-sm">
@@ -266,7 +571,9 @@ export default function Home() {
                             </button>
 
                             <p className="text-text-muted text-sm text-center mt-4">
-                                You'll be the host. Share the room code with players.
+                                {gameMode === 'multi-device'
+                                    ? "You'll be the host. Share the room code with players."
+                                    : "All players will use this device. Pass it between turns."}
                             </p>
                         </>
                     )}

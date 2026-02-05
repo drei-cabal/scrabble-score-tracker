@@ -17,6 +17,11 @@ export interface Room {
     room_code: string
     status: 'waiting' | 'playing' | 'finished'
     current_turn_index: number
+    game_mode: 'multi-device' | 'single-device'
+    turn_timer_enabled: boolean
+    turn_timer_seconds: number
+    turn_started_at: string | null
+    is_paused: boolean
     created_at: string
     updated_at: string
 }
@@ -41,11 +46,11 @@ export interface Move {
     created_at: string
 }
 
-// Helper function to generate unique 4-character room code
+// Helper function to generate unique 5-character room code
 export function generateRoomCode(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
     let code = ''
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
         code += chars.charAt(Math.floor(Math.random() * chars.length))
     }
     return code

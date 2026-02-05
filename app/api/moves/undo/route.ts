@@ -110,7 +110,10 @@ export async function POST(request: NextRequest) {
 
         const { error: turnError } = await supabase
             .from('rooms')
-            .update({ current_turn_index: prevTurnIndex })
+            .update({
+                current_turn_index: prevTurnIndex,
+                turn_started_at: new Date().toISOString()
+            })
             .eq('room_code', roomCode)
 
         if (turnError) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase, type Room, type Player, type Move } from '@/lib/supabase'
 import LiveLeaderboard from '@/components/LiveLeaderboard'
@@ -10,6 +10,10 @@ import SubmitWordForm from '@/components/SubmitWordForm'
 import ConfirmationModal from '@/components/ConfirmationModal'
 import AboutModal from '@/components/AboutModal'
 import HowToUseModal from '@/components/HowToUseModal'
+import LobbyView from '@/components/LobbyView'
+import PassDeviceOverlay from '@/components/PassDeviceOverlay'
+import TimerSettingsModal from '@/components/TimerSettingsModal'
+import { offlineQueue } from '@/lib/offlineQueue'
 
 export default function GamePage() {
     const params = useParams()
@@ -20,6 +24,8 @@ export default function GamePage() {
     const [players, setPlayers] = useState<Player[]>([])
     const [moves, setMoves] = useState<Move[]>([])
     const [myPlayerId, setMyPlayerId] = useState<string | null>(null)
+    const [isSingleDevice, setIsSingleDevice] = useState(false)
+    const [showPassDevice, setShowPassDevice] = useState(false)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [connectionStatus, setConnectionStatus] = useState('CONNECTING')
@@ -27,26 +33,10 @@ export default function GamePage() {
     const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false)
     const [showAbout, setShowAbout] = useState(false)
     const [showHowToUse, setShowHowToUse] = useState(false)
+    const [showTimerSettings, setShowTimerSettings] = useState(false)
 
-    // Load session from localStorage
-    useEffect(() => {
-        const sessionData = localStorage.getItem('scrabble_session')
-        if (!sessionData) {
-            router.push('/')
-            return
-        }
-
-        const session = JSON.parse(sessionData)
-        if (session.roomCode !== roomCode) {
-            router.push('/')
-            return
-        }
-
-        setMyPlayerId(session.playerId)
-        loadGameData(session.playerId)
-    }, [roomCode, router])
-
-    const loadGameData = async (playerId: string) => {
+    // Define loadGameData with useCallback so it can be used in useEffect
+    const loadGameData = useCallback(async (playerId: string) => {
         try {
             // Load room
             const { data: roomData, error: roomError } = await supabase
@@ -85,7 +75,106 @@ export default function GamePage() {
             setError(err.message)
             setLoading(false)
         }
-    }
+    }, [roomCode])
+
+    // Load session from localStorage OR Recover from URL
+    useEffect(() => {
+        const initializeGame = async () => {
+            const sessionData = localStorage.getItem('scrabble_session')
+            let session = sessionData ? JSON.parse(sessionData) : null
+
+            // If session is valid and matches room
+            if (session && session.roomCode === roomCode) {
+                if (session.isSingleDevice) {
+                    setIsSingleDevice(true)
+                    setMyPlayerId(session.hostPlayerId)
+                } else {
+                    setMyPlayerId(session.playerId)
+                }
+                // Call loadGameData if it's available in scope (handled by effect timing)
+                loadGameData(session.playerId || session.hostPlayerId)
+                return
+            }
+
+            // If no valid session, try to recover SINGLE DEVICE game
+            try {
+                // Check if room exists and is single-device
+                const { data: roomCheck } = await supabase
+                    .from('rooms')
+                    .select('game_mode')
+                    .eq('room_code', roomCode)
+                    .single()
+
+                if (roomCheck && roomCheck.game_mode === 'single-device') {
+                    console.log('Recovering Single Device Session...')
+
+                    // Fetch host player to impersonate/resume
+                    const { data: hostPlayer } = await supabase
+                        .from('players')
+                        .select('id')
+                        .eq('room_code', roomCode)
+                        .eq('seat_order', 0)
+                        .single()
+
+                    if (hostPlayer) {
+                        // Create new session
+                        const newSession = {
+                            roomCode,
+                            gameMode: 'single-device',
+                            hostPlayerId: hostPlayer.id,
+                            isSingleDevice: true
+                        }
+                        localStorage.setItem('scrabble_session', JSON.stringify(newSession))
+
+                        setIsSingleDevice(true)
+                        setMyPlayerId(hostPlayer.id)
+                        loadGameData(hostPlayer.id)
+                        return
+                    }
+                }
+            } catch (err) {
+                console.error('Recovery attempt failed:', err)
+            }
+
+            // If recovery failed, back to home
+            router.push('/')
+        }
+
+        initializeGame()
+    }, [roomCode, router, loadGameData])
+
+    // Offline queue sync
+    useEffect(() => {
+        const handleOnline = async () => {
+            console.log('Online detected, syncing queue...')
+            setConnectionStatus('RECONNECTING')
+            await offlineQueue.sync()
+            setConnectionStatus('SUBSCRIBED')
+
+            // Reload data to reflect synced moves
+            const sessionData = localStorage.getItem('scrabble_session')
+            if (sessionData) {
+                const session = JSON.parse(sessionData)
+                loadGameData(session.playerId || session.hostPlayerId)
+            }
+        }
+
+        window.addEventListener('online', handleOnline)
+        return () => window.removeEventListener('online', handleOnline)
+    }, [roomCode])
+
+    // Listen for manual move updates (e.g. from Undo)
+    useEffect(() => {
+        const handleMovesUpdated = () => {
+            if (myPlayerId) {
+                console.log('Manual moves update triggered')
+                loadGameData(myPlayerId)
+            }
+        }
+
+        window.addEventListener('moves-updated', handleMovesUpdated)
+        return () => window.removeEventListener('moves-updated', handleMovesUpdated)
+    }, [myPlayerId, roomCode])
 
     // Subscribe to realtime updates
     useEffect(() => {
@@ -174,40 +263,8 @@ export default function GamePage() {
                 setConnectionStatus(status)
             })
 
-        // Listen for manual refresh events (e.g., after undo)
-        const handleMovesUpdate = () => {
-            console.log('Manual moves refresh triggered')
-            supabase
-                .from('moves')
-                .select('*')
-                .eq('room_code', roomCode)
-                .order('created_at', { ascending: false })
-                .limit(20)
-                .then(({ data }) => {
-                    if (data) setMoves(data)
-                })
-        }
-
-        window.addEventListener('moves-updated', handleMovesUpdate)
-
-        // Polling fallback: refresh moves every 3 seconds to ensure sync
-        // This ensures all clients stay updated even if realtime events fail
-        const pollInterval = setInterval(() => {
-            supabase
-                .from('moves')
-                .select('*')
-                .eq('room_code', roomCode)
-                .order('created_at', { ascending: false })
-                .limit(20)
-                .then(({ data }) => {
-                    if (data) setMoves(data)
-                })
-        }, 3000)
-
         return () => {
             supabase.removeChannel(channel)
-            window.removeEventListener('moves-updated', handleMovesUpdate)
-            clearInterval(pollInterval)
         }
     }, [roomCode])
 
@@ -272,6 +329,161 @@ export default function GamePage() {
         }
     }
 
+    const handlePauseGame = async () => {
+        if (!myPlayerId || !room) return
+
+        try {
+            const action = room.is_paused ? 'resume' : 'pause'
+            const res = await fetch('/api/rooms/pause', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomCode, playerId: myPlayerId, action }),
+            })
+
+            if (!res.ok) throw new Error('Failed to update pause state')
+
+        } catch (err) {
+            console.error('Pause error:', err)
+            alert('Failed to update game state')
+        }
+    }
+
+    const handleOpenTimerSettings = async () => {
+        // Auto-pause the game when opening timer settings
+        if (room && !room.is_paused) {
+            try {
+                const res = await fetch('/api/rooms/pause', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomCode, playerId: myPlayerId, action: 'pause' }),
+                })
+                if (res.ok) {
+                    setShowTimerSettings(true)
+                }
+            } catch (err) {
+                console.error('Failed to pause for timer settings:', err)
+                // Still open modal even if pause fails
+                setShowTimerSettings(true)
+            }
+        } else {
+            setShowTimerSettings(true)
+        }
+    }
+
+    const handleCloseTimerSettings = async (updated: boolean = false) => {
+        setShowTimerSettings(false)
+
+        // Auto-resume the game after closing timer settings (if it was auto-paused)
+        // Only resume if we actually updated the timer, otherwise user might have just cancelled
+        if (room && room.is_paused && updated) {
+            try {
+                await fetch('/api/rooms/pause', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomCode, playerId: myPlayerId, action: 'resume' }),
+                })
+            } catch (err) {
+                console.error('Failed to resume after timer settings:', err)
+            }
+        }
+    }
+
+    const handleUpdateTimer = async (timerSeconds: number) => {
+        if (!myPlayerId) return
+
+        const res = await fetch('/api/rooms/update-timer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roomCode, playerId: myPlayerId, timerSeconds }),
+        })
+
+        if (!res.ok) {
+            const data = await res.json()
+            throw new Error(data.error || 'Failed to update timer')
+        }
+
+        // Close and resume after successful update
+        await handleCloseTimerSettings(true)
+    }
+
+    const handleStartGame = async () => {
+        if (!myPlayerId) return
+
+        try {
+            const res = await fetch('/api/rooms/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomCode, playerId: myPlayerId }),
+            })
+
+            if (!res.ok) {
+                const data = await res.json()
+                throw new Error(data.error || 'Failed to start game')
+            }
+
+            // Room status will update via realtime subscription
+        } catch (err: any) {
+            console.error('Failed to start game:', err)
+            alert(err.message)
+        }
+    }
+
+    const handleTimerExpired = async () => {
+        // Determine who is skipping turn
+        // In Single-Device, it's the current turn player
+        let skipPlayerId = myPlayerId
+
+        if (isSingleDevice) {
+            // Find current turn player
+            const currentTurn = players.find(p => p.role === 'player' && p.seat_order === room?.current_turn_index)
+            if (currentTurn) skipPlayerId = currentTurn.id
+        }
+
+        if (!skipPlayerId) return
+
+        // Auto-skip turn when timer expires
+        try {
+            await fetch('/api/moves/skip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomCode, playerId: skipPlayerId }),
+            })
+        } catch (err: any) {
+            console.error('Auto-skip failed:', err)
+        }
+    }
+
+    const handlePassDeviceReady = async () => {
+        setShowPassDevice(false)
+
+        // Reset timer when player is ready (Single-Device mode only)
+        // This ensures the timer starts effectively when they actually look at the screen
+        if (isSingleDevice && room?.turn_timer_enabled && myPlayerId) {
+            try {
+                await fetch('/api/rooms/reset-timer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomCode, playerId: myPlayerId }), // Host resets it
+                })
+            } catch (err) {
+                console.error('Failed to reset timer:', err)
+            }
+        }
+    }
+
+    // Show pass-device overlay when turn changes in single-device mode
+    useEffect(() => {
+        if (!isSingleDevice || !room || room.status !== 'playing') return
+
+        const currentTurnPlayer = players.find(
+            p => p.role === 'player' && p.seat_order === room.current_turn_index
+        )
+
+        if (currentTurnPlayer) {
+            setShowPassDevice(true)
+        }
+    }, [room?.current_turn_index, isSingleDevice, room?.status, players])
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -304,11 +516,58 @@ export default function GamePage() {
         (p) => p.role === 'player' && p.seat_order === room?.current_turn_index
     )
 
-    const isMyTurn = currentPlayer?.role === 'player' &&
-        currentPlayer?.seat_order === room?.current_turn_index
+    const isMyTurn = isSingleDevice || (currentPlayer?.role === 'player' &&
+        currentPlayer?.seat_order === room?.current_turn_index)
+
+    // Show lobby if room status is 'waiting'
+    if (room?.status === 'waiting') {
+        return (
+            <LobbyView
+                roomCode={roomCode}
+                players={players}
+                isHost={isAdmin}
+                onStartGame={handleStartGame}
+                gameMode={room.game_mode}
+            />
+        )
+    }
+
+    // Get next player name for pass-device overlay
+    const nextPlayer = players.find(
+        p => p.role === 'player' && p.seat_order === room?.current_turn_index
+    )
 
     return (
         <div className="min-h-screen p-2 md:p-4">
+            {/* Pass Device Overlay (Single-Device Mode Only) */}
+            {isSingleDevice && nextPlayer && (
+                <PassDeviceOverlay
+                    isVisible={showPassDevice}
+                    nextPlayerName={nextPlayer.name}
+                    onReady={handlePassDeviceReady}
+                />
+            )}
+
+            {/* Paused Overlay */}
+            {room?.is_paused && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-gradient-to-br from-primary/20 to-secondary border-2 border-primary rounded-2xl p-5 md:p-6 max-w-xs md:max-w-sm w-full text-center shadow-2xl">
+                        <div className="mb-3 md:mb-4">
+                            <svg className="w-10 h-10 md:w-12 md:h-12 mx-auto text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <h2 className="text-lg md:text-xl font-bold mb-1 text-white">Game Paused</h2>
+                        <p className="text-text-muted text-xs md:text-sm mb-3 md:mb-4">The host has paused the game.</p>
+                        {isAdmin && (
+                            <button onClick={handlePauseGame} className="btn-primary w-full py-2 md:py-2.5 text-sm md:text-base font-bold">
+                                Continue
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
             <ConfirmationModal
                 isOpen={isDeleteModalOpen}
                 title="Delete Room?"
@@ -342,6 +601,50 @@ export default function GamePage() {
                             }`}>
                             {connectionStatus === 'SUBSCRIBED' ? '● Live' : '○ Connecting...'}
                         </div>
+
+                        {/* Timer Settings Button */}
+                        {isAdmin && room?.status === 'playing' && room?.turn_timer_enabled && (
+                            <button
+                                onClick={handleOpenTimerSettings}
+                                className="px-2 md:px-3 py-1 md:py-2 rounded-lg transition-all font-semibold text-xs md:text-sm flex items-center gap-1 bg-gray-700/50 text-gray-300 border border-gray-600 hover:bg-gray-700"
+                                title="Adjust Timer"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span className="hidden md:inline">Timer</span>
+                            </button>
+                        )}
+
+                        {/* Pause Button */}
+                        {isAdmin && room?.status === 'playing' && (
+                            <button
+                                onClick={handlePauseGame}
+                                className={`px-2 md:px-3 py-1 md:py-2 rounded-lg transition-all font-semibold text-xs md:text-sm flex items-center gap-1 ${room.is_paused
+                                    ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 hover:bg-yellow-500/30'
+                                    : 'bg-gray-700/50 text-gray-300 border border-gray-600 hover:bg-gray-700'
+                                    }`}
+                                title={room.is_paused ? "Resume Game" : "Pause Game"}
+                            >
+                                {room.is_paused ? (
+                                    <>
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span className="hidden md:inline">Resume</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span className="hidden md:inline">Pause</span>
+                                    </>
+                                )}
+                            </button>
+                        )}
+
                         {isAdmin && (
                             <button
                                 onClick={handleDeleteRoom}
@@ -351,7 +654,7 @@ export default function GamePage() {
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
-                                <span className="hidden md:inline">Delete Room</span>
+                                <span className="hidden md:inline">Delete</span>
                             </button>
                         )}
                         <button
@@ -386,7 +689,13 @@ export default function GamePage() {
                 {/* Left Column - Order 2 on mobile */}
                 <div className="space-y-3 md:space-y-6 order-2 lg:order-none">
                     {/* Show Current Turn FIRST on mobile to give context */}
-                    {currentTurnPlayer && <CurrentTurn player={currentTurnPlayer} />}
+                    {currentTurnPlayer && room && (
+                        <CurrentTurn
+                            player={currentTurnPlayer}
+                            room={room}
+                            onTimerExpired={handleTimerExpired}
+                        />
+                    )}
                     <LiveLeaderboard players={players} />
                 </div>
 
@@ -397,12 +706,15 @@ export default function GamePage() {
 
                 {/* Right Column - Order 1 on mobile (Input first) */}
                 <div className="space-y-3 md:space-y-6 order-1 lg:order-none">
-                    {currentPlayer && (
+                    {/* In single-device mode, we submit as the current turn player */}
+                    {/* In multi-device mode, we submit as ourselves */}
+                    {(isSingleDevice ? currentTurnPlayer : currentPlayer) && (
                         <SubmitWordForm
                             roomCode={roomCode}
-                            playerId={currentPlayer.id}
+                            playerId={(isSingleDevice && currentTurnPlayer?.id) || currentPlayer?.id || ''}
+                            hostId={isSingleDevice ? currentPlayer?.id : undefined}
                             isMyTurn={isMyTurn}
-                            isSpectator={currentPlayer.role === 'spectator'}
+                            isSpectator={currentPlayer?.role === 'spectator'}
                             isHost={isAdmin}
                         />
                     )}
@@ -412,6 +724,12 @@ export default function GamePage() {
             {/* Modals */}
             <AboutModal isOpen={showAbout} onClose={() => setShowAbout(false)} />
             <HowToUseModal isOpen={showHowToUse} onClose={() => setShowHowToUse(false)} />
+            <TimerSettingsModal
+                isOpen={showTimerSettings}
+                currentSeconds={room?.turn_timer_seconds || 60}
+                onClose={() => handleCloseTimerSettings(false)}
+                onUpdate={handleUpdateTimer}
+            />
         </div>
     )
 }

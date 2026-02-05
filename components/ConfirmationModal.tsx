@@ -36,32 +36,32 @@ export default function ConfirmationModal({
             />
 
             {/* Modal Content */}
-            <div className="relative w-full max-w-sm bg-card border border-white/10 rounded-xl shadow-2xl overflow-hidden transform transition-all scale-100 animate-in fade-in zoom-in duration-200">
+            <div className="relative w-full max-w-xs md:max-w-sm bg-card border border-white/10 rounded-xl shadow-2xl overflow-hidden transform transition-all scale-100 animate-in fade-in zoom-in duration-200">
                 {/* Header */}
                 <div className="p-4 md:p-6 pb-2">
-                    <h3 className={`text-xl font-bold ${isDanger ? 'text-red-400' : 'text-white'}`}>
+                    <h3 className={`text-lg md:text-xl font-bold ${isDanger ? 'text-red-400' : 'text-white'}`}>
                         {title}
                     </h3>
                 </div>
 
                 {/* Body */}
                 <div className="px-4 md:px-6 py-2">
-                    <p className="text-gray-300 text-sm md:text-base leading-relaxed">
+                    <p className="text-gray-300 text-xs md:text-sm leading-relaxed">
                         {message}
                     </p>
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 md:p-6 pt-4 flex gap-3 justify-end">
+                <div className="p-4 md:p-6 pt-4 flex gap-2 md:gap-3 justify-end">
                     <button
                         onClick={onCancel}
-                        className="px-4 py-2 text-sm font-semibold text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors border border-white/5"
+                        className="px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors border border-white/5"
                     >
                         {cancelText}
                     </button>
                     <button
                         onClick={onConfirm}
-                        className={`px-4 py-2 text-sm font-semibold text-white rounded-lg shadow-lg transition-all transform hover:scale-105 active:scale-95 border border-white/10 
+                        className={`px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm font-semibold text-white rounded-lg shadow-lg transition-all transform hover:scale-105 active:scale-95 border border-white/10 
                             ${isDanger
                                 ? 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400'
                                 : 'bg-gradient-primary'

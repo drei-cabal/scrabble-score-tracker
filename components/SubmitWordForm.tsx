@@ -1,14 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import WordBuilder from './WordBuilder'
 import ConfirmationModal from './ConfirmationModal'
 import { TileData } from '@/lib/scoring'
 import { v4 as uuidv4 } from 'uuid'
+import { offlineQueue } from '@/lib/offlineQueue'
 
 interface SubmitWordFormProps {
     roomCode: string
     playerId: string
+    hostId?: string
     isMyTurn: boolean
     isSpectator: boolean
     isHost?: boolean
@@ -34,6 +36,7 @@ interface TurnWord {
 export default function SubmitWordForm({
     roomCode,
     playerId,
+    hostId,
     isMyTurn,
     isSpectator,
     isHost = false,
@@ -59,6 +62,20 @@ export default function SubmitWordForm({
         isDanger: false
     })
 
+    const [isOffline, setIsOffline] = useState(false)
+
+    useEffect(() => {
+        setIsOffline(!navigator.onLine)
+        const handleOnline = () => setIsOffline(false)
+        const handleOffline = () => setIsOffline(true)
+        window.addEventListener('online', handleOnline)
+        window.addEventListener('offline', handleOffline)
+        return () => {
+            window.removeEventListener('online', handleOnline)
+            window.removeEventListener('offline', handleOffline)
+        }
+    }, [])
+
     const turnTotal = turnWords.reduce((sum, w) => sum + w.points, 0)
 
     const handleAddWord = (word: string, points: number, tiles: TileData[]) => {
@@ -80,20 +97,32 @@ export default function SubmitWordForm({
         setError('')
         setSuccess('')
 
-        try {
-            // Concatenate words for display, e.g., "WORD1, WORD2"
-            const wordDisplay = turnWords.map(w => w.word).join(', ')
+        // Concatenate words for display
+        const wordDisplay = turnWords.map(w => w.word).join(', ')
+        const payload = {
+            roomCode,
+            playerId,
+            word: wordDisplay,
+            points: turnTotal,
+            details: turnWords
+        }
 
+        if (!navigator.onLine) {
+            // Offline Mode: Queue the move
+            offlineQueue.add('submit', payload)
+            setTurnWords([])
+            setSuccess('Offline: Move queued. It will sync when you reconnect.')
+            setLoading(false)
+            // Note: Game state won't update until sync, so turn won't advance visually
+            // Ideally wed have optimistic local state update here
+            return
+        }
+
+        try {
             const response = await fetch('/api/moves/submit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    roomCode,
-                    playerId,
-                    word: wordDisplay,
-                    points: turnTotal,
-                    details: turnWords // Pass full details if backend wants to store them, currently mostly for scoring
-                }),
+                body: JSON.stringify(payload),
             })
 
             const data = await response.json()
@@ -102,8 +131,6 @@ export default function SubmitWordForm({
                 throw new Error(data.error || 'Failed to submit turn')
             }
 
-            // Success feedback removed per user request for cleaner UI
-            // The leaderboard and turn change serves as confirmation
             setTurnWords([])
         } catch (err: any) {
             setError(err.message)
@@ -122,7 +149,10 @@ export default function SubmitWordForm({
             const response = await fetch('/api/moves/undo', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ roomCode, playerId }),
+                body: JSON.stringify({
+                    roomCode,
+                    playerId: hostId || playerId
+                }),
             })
 
             const data = await response.json()
@@ -236,6 +266,12 @@ export default function SubmitWordForm({
             {!isMyTurn && !isSpectator && (
                 <div className="p-3 bg-yellow-500/20 border border-yellow-500 rounded-lg text-yellow-200 text-sm transition-all duration-200">
                     Waiting for your turn...
+                </div>
+            )}
+            {isOffline && (
+                <div className="p-3 bg-orange-500/20 border border-orange-500 rounded-lg text-orange-200 text-sm flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 011.414 0" /></svg>
+                    You are offline. Moves will be queued.
                 </div>
             )}
             {error && <div className="p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-200 text-sm transition-all duration-200">{error}</div>}

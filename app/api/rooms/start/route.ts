@@ -7,12 +7,12 @@ export async function POST(request: NextRequest) {
 
         if (!roomCode || !playerId) {
             return NextResponse.json(
-                { error: 'Missing required fields' },
+                { error: 'Room code and player ID are required' },
                 { status: 400 }
             )
         }
 
-        // Get current room state
+        // Get room
         const { data: room, error: roomError } = await supabase
             .from('rooms')
             .select('*')
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Get player info
+        // Verify requester is the host (seat_order === 0)
         const { data: player, error: playerError } = await supabase
             .from('players')
             .select('*')
@@ -41,54 +41,39 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Validate it's the player's turn (skip for single-device mode)
-        if (room.game_mode !== 'single-device' && player.seat_order !== room.current_turn_index) {
+        if (player.seat_order !== 0 || player.role !== 'player') {
             return NextResponse.json(
-                { error: 'Not your turn' },
+                { error: 'Only the host can start the game' },
                 { status: 403 }
             )
         }
 
-        if (player.role !== 'player') {
-            return NextResponse.json(
-                { error: 'Spectators cannot skip turns' },
-                { status: 403 }
-            )
-        }
-
-        // Get player count
-        const { data: allPlayers } = await supabase
+        // Check if there are at least 2 players
+        const { data: players, error: playersError } = await supabase
             .from('players')
             .select('*')
             .eq('room_code', roomCode)
             .eq('role', 'player')
 
-        const playerCount = allPlayers?.length || 1
-
-        // Insert skip move
-        const { error: moveError } = await supabase
-            .from('moves')
-            .insert({
-                room_code: roomCode,
-                player_id: playerId,
-                word_played: null,
-                points_scored: 0,
-                move_type: 'skip',
-            })
-
-        if (moveError) {
-            console.error('Skip move error:', moveError)
+        if (playersError) {
             return NextResponse.json(
-                { error: 'Failed to record skip' },
+                { error: 'Failed to check players' },
                 { status: 500 }
             )
         }
 
-        // Advance turn and reset timer
-        const nextTurnIndex = (room.current_turn_index + 1) % playerCount
-        const updateData: any = { current_turn_index: nextTurnIndex }
+        if (!players || players.length < 2) {
+            return NextResponse.json(
+                { error: 'At least 2 players are required to start the game' },
+                { status: 400 }
+            )
+        }
 
-        // Reset timer if enabled
+        // Update room status to 'playing' and set turn_started_at if timer is enabled
+        const updateData: any = {
+            status: 'playing',
+        }
+
         if (room.turn_timer_enabled) {
             // For single-device mode, we pause the timer (set to null) until they click "Ready"
             if (room.game_mode === 'single-device') {
@@ -98,25 +83,25 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        const { error: turnError } = await supabase
+        const { error: updateError } = await supabase
             .from('rooms')
             .update(updateData)
             .eq('room_code', roomCode)
 
-        if (turnError) {
-            console.error('Turn update error:', turnError)
+        if (updateError) {
+            console.error('Failed to start game:', updateError)
             return NextResponse.json(
-                { error: 'Failed to advance turn' },
+                { error: 'Failed to start game' },
                 { status: 500 }
             )
         }
 
         return NextResponse.json({
             success: true,
-            nextTurnIndex,
+            message: 'Game started successfully',
         })
     } catch (error) {
-        console.error('Skip turn error:', error)
+        console.error('Start game error:', error)
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

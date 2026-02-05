@@ -1,10 +1,14 @@
-import { Player } from '@/lib/supabase'
+import { Player, Room } from '@/lib/supabase'
+import TurnTimer from './TurnTimer'
+import ErrorBoundary from './ErrorBoundary'
 
 interface CurrentTurnProps {
     player: Player
+    room: Room
+    onTimerExpired: () => void
 }
 
-export default function CurrentTurn({ player }: CurrentTurnProps) {
+export default function CurrentTurn({ player, room, onTimerExpired }: CurrentTurnProps) {
     return (
         <div className="relative overflow-hidden rounded-lg p-3 md:p-6 bg-gradient-primary shadow-lg">
             {/* Crown Icon */}
@@ -22,6 +26,20 @@ export default function CurrentTurn({ player }: CurrentTurnProps) {
                 <p className="text-xl md:text-3xl font-bold text-white border-b-2 md:border-b-4 border-white inline-block pb-0.5 md:pb-1">
                     {player.name}
                 </p>
+
+                {/* Timer */}
+                {room.turn_timer_enabled && room.status === 'playing' && (
+                    <div className="mt-3 md:mt-4 flex justify-center">
+                        <ErrorBoundary>
+                            <TurnTimer
+                                turnStartedAt={room.turn_started_at}
+                                turnTimerSeconds={room.turn_timer_seconds}
+                                isPaused={room.is_paused}
+                                onTimeExpired={onTimerExpired}
+                            />
+                        </ErrorBoundary>
+                    </div>
+                )}
             </div>
 
             {/* Decorative gradient overlay */}

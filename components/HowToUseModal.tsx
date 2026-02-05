@@ -70,6 +70,30 @@ export default function HowToUseModal({ isOpen, onClose }: HowToUseModalProps) {
                         <section>
                             <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-3">
                                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-sm font-bold flex-shrink-0">2</span>
+                                Game Modes
+                            </h3>
+                            <ul className="space-y-1.5 ml-10 text-sm">
+                                <li><strong className="text-white">Multi-Device:</strong> Each player joins from their own device. Perfect for remote play or when everyone has their own phone/tablet.</li>
+                                <li><strong className="text-white">Single-Device:</strong> Pass one device between players. The "Pass Device To" overlay appears between turns to ensure privacy.</li>
+                            </ul>
+                        </section>
+
+                        <section>
+                            <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-3">
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-sm font-bold flex-shrink-0">3</span>
+                                Turn Timer
+                            </h3>
+                            <ul className="space-y-1.5 ml-10 text-sm">
+                                <li><strong className="text-white">Enable Timer:</strong> Set a time limit (10-300 seconds) when creating a room</li>
+                                <li><strong className="text-white">Adjust Timer:</strong> Host can click the "Timer" button to change the duration mid-game</li>
+                                <li><strong className="text-white">Auto-Skip:</strong> If time runs out, the turn automatically skips to the next player</li>
+                                <li><strong className="text-white">Timer Resets:</strong> Timer restarts after each turn, undo, or when resuming from pause</li>
+                            </ul>
+                        </section>
+
+                        <section>
+                            <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-3">
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-sm font-bold flex-shrink-0">4</span>
                                 Understanding the Interface
                             </h3>
                             <ul className="space-y-1.5 ml-10 text-sm">
@@ -82,7 +106,7 @@ export default function HowToUseModal({ isOpen, onClose }: HowToUseModalProps) {
 
                         <section>
                             <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-3">
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-sm font-bold flex-shrink-0">3</span>
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-sm font-bold flex-shrink-0">5</span>
                                 Using the Word Builder
                             </h3>
                             <ul className="space-y-1.5 ml-10 text-sm">
@@ -104,7 +128,7 @@ export default function HowToUseModal({ isOpen, onClose }: HowToUseModalProps) {
 
                         <section>
                             <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-3">
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-sm font-bold flex-shrink-0">4</span>
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-sm font-bold flex-shrink-0">6</span>
                                 Turn Buffer (Multiple Words)
                             </h3>
                             <ul className="space-y-1.5 ml-10 text-sm">
@@ -117,7 +141,7 @@ export default function HowToUseModal({ isOpen, onClose }: HowToUseModalProps) {
 
                         <section>
                             <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-3">
-                                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-sm font-bold flex-shrink-0">5</span>
+                                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-sm font-bold flex-shrink-0">7</span>
                                 Other Actions
                             </h3>
                             <ul className="space-y-1.5 ml-10 text-sm">
@@ -132,6 +156,8 @@ export default function HowToUseModal({ isOpen, onClose }: HowToUseModalProps) {
                                 Host Controls
                             </h3>
                             <ul className="space-y-1.5 ml-10 text-sm">
+                                <li><strong className="text-white">Pause Game:</strong> Freeze the game and timer. Click "Continue" to resume.</li>
+                                <li><strong className="text-white">Adjust Timer:</strong> Change the turn timer duration (only if timer is enabled)</li>
                                 <li><strong className="text-white">Undo Last Move:</strong> Revert the most recent turn (reverts score and turn order)</li>
                                 <li><strong className="text-white">Delete Room:</strong> Permanently delete the game room (top-right button)</li>
                             </ul>

@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Validate it's the player's turn
-        if (player.seat_order !== room.current_turn_index) {
+        // Validate it's the player's turn (skip for single-device mode)
+        if (room.game_mode !== 'single-device' && player.seat_order !== room.current_turn_index) {
             return NextResponse.json(
                 { error: 'Not your turn' },
                 { status: 403 }
@@ -118,11 +118,23 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // 3. Advance turn
+        // 3. Advance turn and reset timer
         const nextTurnIndex = (room.current_turn_index + 1) % playerCount
+        const updateData: any = { current_turn_index: nextTurnIndex }
+
+        // Reset timer if enabled
+        if (room.turn_timer_enabled) {
+            // For single-device mode, we pause the timer (set to null) until they click "Ready"
+            if (room.game_mode === 'single-device') {
+                updateData.turn_started_at = null
+            } else {
+                updateData.turn_started_at = new Date().toISOString()
+            }
+        }
+
         const { error: turnError } = await supabase
             .from('rooms')
-            .update({ current_turn_index: nextTurnIndex })
+            .update(updateData)
             .eq('room_code', roomCode)
 
         if (turnError) {

@@ -29,6 +29,32 @@ export async function POST(request: NextRequest) {
             )
         }
 
+        // Check if room is single-device mode
+        if (room.game_mode === 'single-device') {
+            // Only allow joining if explicitly requesting spectator mode
+            if (!forceSpectator) {
+                // Allow "Remote Control" / Recovery
+                // Fetch the host player to allow controlling the game from a new device
+                const { data: hostPlayer } = await supabase
+                    .from('players')
+                    .select('*')
+                    .eq('room_code', trimmedCode)
+                    .eq('seat_order', 0)
+                    .single()
+
+                if (hostPlayer) {
+                    return NextResponse.json({
+                        playerId: hostPlayer.id, // Use host ID as the active session ID
+                        role: 'player',
+                        gameMode: 'single-device',
+                        isSingleDevice: true,
+                        hostPlayerId: hostPlayer.id,
+                        message: 'Recovered single-device session.',
+                    })
+                }
+            }
+        }
+
         // Check if name is already taken in this room
         const { data: existingPlayer } = await supabase
             .from('players')
@@ -52,6 +78,7 @@ export async function POST(request: NextRequest) {
             .select('*')
             .eq('room_code', trimmedCode)
             .eq('role', 'player')
+            .order('created_at', { ascending: true })
 
         if (playersError) {
             console.error('Players query error:', playersError)
@@ -65,7 +92,8 @@ export async function POST(request: NextRequest) {
         const playerCount = players?.length || 0
         const role = forceSpectator || playerCount >= 4 ? 'spectator' : 'player'
 
-        // Assign seat order only for players
+        // Assign seat order based on join order (created_at timestamp)
+        // For players, seat_order is determined by their position in the join sequence
         const seatOrder = role === 'player' ? playerCount : null
 
         // Create player

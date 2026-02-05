@@ -3,11 +3,44 @@ import { supabase, generateRoomCode } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
     try {
-        const { playerName } = await request.json()
+        const {
+            playerName,
+            gameMode = 'multi-device',
+            turnTimerEnabled = false,
+            turnTimerSeconds = 60,
+            playerNames = [] // For single-device mode
+        } = await request.json()
 
-        if (!playerName || !playerName.trim()) {
+        // Validation
+        if (gameMode === 'single-device') {
+            if (!playerNames || playerNames.length < 2 || playerNames.length > 4) {
+                return NextResponse.json(
+                    { error: 'Single-device mode requires 2-4 player names' },
+                    { status: 400 }
+                )
+            }
+            // Check for duplicate names
+            const uniqueNames = new Set(playerNames.map((n: string) => n.trim().toLowerCase()))
+            if (uniqueNames.size !== playerNames.length) {
+                return NextResponse.json(
+                    { error: 'Player names must be unique' },
+                    { status: 400 }
+                )
+            }
+        } else {
+            // Multi-device mode
+            if (!playerName || !playerName.trim()) {
+                return NextResponse.json(
+                    { error: 'Player name is required' },
+                    { status: 400 }
+                )
+            }
+        }
+
+        // Validate timer settings
+        if (turnTimerEnabled && (turnTimerSeconds < 10 || turnTimerSeconds > 300)) {
             return NextResponse.json(
-                { error: 'Player name is required' },
+                { error: 'Timer must be between 10 and 300 seconds' },
                 { status: 400 }
             )
         }
@@ -39,13 +72,17 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Create room
+        // Create room with new fields
         const { data: room, error: roomError } = await supabase
             .from('rooms')
             .insert({
                 room_code: roomCode,
                 status: 'waiting',
                 current_turn_index: 0,
+                game_mode: gameMode,
+                turn_timer_enabled: turnTimerEnabled,
+                turn_timer_seconds: turnTimerSeconds,
+                turn_started_at: null, // Will be set when game starts
             })
             .select()
             .single()
@@ -58,34 +95,69 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Create first player (host)
-        const { data: player, error: playerError } = await supabase
-            .from('players')
-            .insert({
+        // Create players based on game mode
+        if (gameMode === 'single-device') {
+            // Create all players at once
+            const playersToInsert = playerNames.map((name: string, index: number) => ({
                 room_code: roomCode,
-                name: playerName.trim(),
+                name: name.trim(),
                 total_score: 0,
-                seat_order: 0,
+                seat_order: index,
                 role: 'player',
+            }))
+
+            const { data: players, error: playersError } = await supabase
+                .from('players')
+                .insert(playersToInsert)
+                .select()
+
+            if (playersError) {
+                console.error('Players creation error:', playersError)
+                // Clean up room if player creation fails
+                await supabase.from('rooms').delete().eq('room_code', roomCode)
+                return NextResponse.json(
+                    { error: 'Failed to create players' },
+                    { status: 500 }
+                )
+            }
+
+            return NextResponse.json({
+                roomCode,
+                gameMode,
+                playerIds: players.map(p => p.id),
+                hostPlayerId: players[0].id, // First player is host
             })
-            .select()
-            .single()
+        } else {
+            // Multi-device mode: create only the host player
+            const { data: player, error: playerError } = await supabase
+                .from('players')
+                .insert({
+                    room_code: roomCode,
+                    name: playerName.trim(),
+                    total_score: 0,
+                    seat_order: 0,
+                    role: 'player',
+                })
+                .select()
+                .single()
 
-        if (playerError) {
-            console.error('Player creation error:', playerError)
-            // Clean up room if player creation fails
-            await supabase.from('rooms').delete().eq('room_code', roomCode)
-            return NextResponse.json(
-                { error: 'Failed to create player' },
-                { status: 500 }
-            )
+            if (playerError) {
+                console.error('Player creation error:', playerError)
+                // Clean up room if player creation fails
+                await supabase.from('rooms').delete().eq('room_code', roomCode)
+                return NextResponse.json(
+                    { error: 'Failed to create player' },
+                    { status: 500 }
+                )
+            }
+
+            return NextResponse.json({
+                roomCode,
+                gameMode,
+                playerId: player.id,
+                role: player.role,
+            })
         }
-
-        return NextResponse.json({
-            roomCode,
-            playerId: player.id,
-            role: player.role,
-        })
     } catch (error) {
         console.error('Create room error:', error)
         return NextResponse.json(

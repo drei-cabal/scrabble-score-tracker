@@ -7,6 +7,10 @@ CREATE TABLE IF NOT EXISTS rooms (
   room_code VARCHAR(4) UNIQUE NOT NULL,
   status VARCHAR(20) DEFAULT 'waiting' CHECK (status IN ('waiting', 'playing', 'finished')),
   current_turn_index INTEGER DEFAULT 0,
+  game_mode VARCHAR(20) DEFAULT 'multi-device' CHECK (game_mode IN ('multi-device', 'single-device')),
+  turn_timer_enabled BOOLEAN DEFAULT false,
+  turn_timer_seconds INTEGER DEFAULT 60 CHECK (turn_timer_seconds >= 10 AND turn_timer_seconds <= 300),
+  turn_started_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -39,6 +43,7 @@ CREATE INDEX IF NOT EXISTS idx_players_room_code ON players(room_code);
 CREATE INDEX IF NOT EXISTS idx_players_seat_order ON players(room_code, seat_order);
 CREATE INDEX IF NOT EXISTS idx_moves_room_code ON moves(room_code);
 CREATE INDEX IF NOT EXISTS idx_moves_created_at ON moves(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_rooms_game_mode ON rooms(game_mode);
 
 -- Enable Row Level Security
 ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
