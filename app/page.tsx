@@ -22,34 +22,9 @@ export default function Home() {
     const [error, setError] = useState('')
     const [showAbout, setShowAbout] = useState(false)
     const [showHowToUse, setShowHowToUse] = useState(false)
-    const [activeSession, setActiveSession] = useState<any>(null)
     const router = useRouter()
 
-    useEffect(() => {
-        const checkSession = () => {
-            try {
-                const savedSession = localStorage.getItem('scrabble_session')
-                if (savedSession) {
-                    const parsed = JSON.parse(savedSession)
-                    if (parsed && parsed.roomCode) {
-                        console.log('Restoring active session:', parsed)
-                        setActiveSession(parsed)
-                    }
-                }
-            } catch (e) {
-                console.error("Invalid session", e)
-                localStorage.removeItem('scrabble_session')
-            }
-        }
 
-        checkSession()
-    }, [])
-
-    const handleReconnect = () => {
-        if (activeSession?.roomCode) {
-            router.push(`/game/${activeSession.roomCode}`)
-        }
-    }
 
     const handleReconnectToRoom = async () => {
         const trimmedCode = reconnectCode.trim().toUpperCase()
@@ -305,37 +280,6 @@ export default function Home() {
                     </button>
                 </div>
 
-                {/* Reconnect Button */}
-                {activeSession && activeSession.roomCode && (
-                    <div className="mb-6 animate-in fade-in zoom-in-95 duration-300">
-                        <button
-                            onClick={handleReconnect}
-                            className="w-full p-4 bg-secondary border border-primary/50 rounded-xl hover:bg-primary/10 transition-all group relative overflow-hidden shadow-lg text-left"
-                        >
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary border border-primary/30 shrink-0">
-                                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <div className="font-bold text-lg text-white group-hover:text-primary transition-colors">Rejoin Active Game</div>
-                                        <div className="text-sm text-text-muted flex items-center flex-wrap gap-2">
-                                            <span className={`w-2 h-2 rounded-full ${activeSession.isSingleDevice ? 'bg-blue-400' : 'bg-green-400'}`}></span>
-                                            {activeSession.isSingleDevice ? 'Single-Device' : 'Multi-Device'}
-                                            <span className="opacity-50 hidden sm:inline">•</span>
-                                            <span className="whitespace-nowrap">Room: <span className="font-mono text-white tracking-wider">{activeSession.roomCode}</span></span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="hidden sm:block bg-primary text-black px-4 py-2 rounded-lg text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity translate-x-4 group-hover:translate-x-0 transform">
-                                    Play &rarr;
-                                </div>
-                            </div>
-                        </button>
-                    </div>
-                )}
 
                 {/* Content Card */}
                 <div className="card p-6 sm:p-8">
