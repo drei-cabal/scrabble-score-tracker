@@ -81,7 +81,9 @@ export const addToBag = (bag: Record<string, number>, tiles: TileData[]): Record
     for (const tile of tiles) {
         const key = tile.isBlank ? 'BLANK' : tile.char.toUpperCase()
         if (newBag[key] !== undefined) {
-            newBag[key] = newBag[key] + 1
+            // Cap at initial distribution to prevent overflow from bugs or multiple undos
+            const maxCount = INITIAL_TILE_DISTRIBUTION[key] || 0
+            newBag[key] = Math.min(maxCount, newBag[key] + 1)
         }
     }
     return newBag

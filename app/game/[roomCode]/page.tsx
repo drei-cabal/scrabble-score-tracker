@@ -16,6 +16,7 @@ import PassDeviceOverlay from '@/components/ui/PassDeviceOverlay'
 import TimerSettingsModal from '@/components/modals/TimerSettingsModal'
 import TileBag from '@/components/game/TileBag'
 import { offlineQueue } from '@/lib/offlineQueue'
+import { INITIAL_TILE_DISTRIBUTION } from '@/lib/scoring'
 
 export default function GamePage() {
     const params = useParams()
@@ -831,7 +832,7 @@ export default function GamePage() {
                             />
                         )
                     }
-                    {room && <TileBag bag={room.tile_bag || {}} />}
+                    {room && <TileBag bag={room.tile_bag || INITIAL_TILE_DISTRIBUTION} />}
                     <LiveLeaderboard players={players} />
                 </div >
 
