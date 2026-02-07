@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase, generateRoomCode } from '@/lib/supabase'
+import { INITIAL_TILE_DISTRIBUTION } from '@/lib/scoring'
 
 export async function POST(request: NextRequest) {
     try {
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest) {
                 turn_timer_enabled: turnTimerEnabled,
                 turn_timer_seconds: turnTimerSeconds,
                 turn_started_at: null, // Will be set when game starts
+                tile_bag: INITIAL_TILE_DISTRIBUTION,
             })
             .select()
             .single()
