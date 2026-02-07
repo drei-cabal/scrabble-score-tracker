@@ -82,73 +82,36 @@ export async function POST(request: NextRequest) {
 
         const playerCount = allPlayers.length
 
-        // Execute transaction-like operations
-
-        // 1. Insert move
-        const { error: moveError } = await supabase
-            .from('moves')
-            .insert({
-                room_code: roomCode,
-                player_id: playerId,
-                word_played: word.trim().toUpperCase(),
-                points_scored: points,
-                move_type: 'word',
-                move_details: details,
-            })
-
-        if (moveError) {
-            console.error('Move insert error:', moveError)
-            return NextResponse.json(
-                { error: 'Failed to record move' },
-                { status: 500 }
-            )
-        }
-
-        // 2. Update player score
-        const { error: scoreError } = await supabase
-            .from('players')
-            .update({ total_score: player.total_score + points })
-            .eq('id', playerId)
-
-        if (scoreError) {
-            console.error('Score update error:', scoreError)
-            return NextResponse.json(
-                { error: 'Failed to update score' },
-                { status: 500 }
-            )
-        }
-
-        // 3. Update Tile Bag
-        // Flatten all tiles from all words in the turn
-        const allTiles: TileData[] = (details as any[]).flatMap(d => d.tiles || [])
+        // Pre-calculate next state
+        const allTiles: TileData[] = (details as any[]).flatMap((d: any) => d.tiles || [])
         const newBag = subtractFromBag(room.tile_bag || {}, allTiles)
-
-        // 4. Advance turn and reset timer
         const nextTurnIndex = (room.current_turn_index + 1) % playerCount
-        const updateData: any = {
-            current_turn_index: nextTurnIndex,
-            tile_bag: newBag
-        }
 
-        // Reset timer if enabled
+        let turnStartedAt = null
         if (room.turn_timer_enabled) {
-            // For single-device mode, we pause the timer (set to null) until they click "Ready"
             if (room.game_mode === 'single-device') {
-                updateData.turn_started_at = null
+                turnStartedAt = null
             } else {
-                updateData.turn_started_at = new Date().toISOString()
+                turnStartedAt = new Date().toISOString()
             }
         }
 
-        const { error: turnError } = await supabase
-            .from('rooms')
-            .update(updateData)
-            .eq('room_code', roomCode)
+        // Execute atomic transaction
+        const { error: rpcError } = await supabase.rpc('submit_move_atomic', {
+            p_room_code: roomCode,
+            p_player_id: playerId,
+            p_word: word.trim().toUpperCase(),
+            p_points: points,
+            p_details: details,
+            p_new_bag: newBag,
+            p_next_turn: nextTurnIndex,
+            p_turn_started_at: turnStartedAt
+        })
 
-        if (turnError) {
-            console.error('Turn update error:', turnError)
+        if (rpcError) {
+            console.error('Submit RPC error:', rpcError)
             return NextResponse.json(
-                { error: 'Failed to advance turn' },
+                { error: 'Failed to submit move. Please ensure database migrations are applied.' },
                 { status: 500 }
             )
         }

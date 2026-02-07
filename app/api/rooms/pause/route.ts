@@ -31,6 +31,14 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Player not found' }, { status: 404 })
         }
 
+        // Only host can pause/resume
+        if (requestor.seat_order !== 0) {
+            return NextResponse.json(
+                { error: 'Only the host can pause/resume the game' },
+                { status: 403 }
+            )
+        }
+
         // 2. Prepare Updates
         const updates: any = {
             is_paused: (action === 'pause')

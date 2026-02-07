@@ -72,16 +72,14 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Original player not found' }, { status: 404 })
         }
 
-        // 5. Execute Undo Operations
+        // 5. Execute Atomic Undo
 
         // A. Restore Tile Bag
-        // Flatten all tiles from the move details
         const details = lastMove.move_details || []
-        const allTiles: TileData[] = (details as any[]).flatMap(d => d.tiles || [])
+        const allTiles: TileData[] = (details as any[]).flatMap((d: any) => d.tiles || [])
         const restoredBag = addToBag(room.tile_bag || {}, allTiles)
 
-        // B. Revert Turn Index & Bag
-        // Get total valid players
+        // B. Revert Turn Index
         const { data: allPlayers } = await supabase
             .from('players')
             .select('*')
@@ -91,41 +89,22 @@ export async function POST(request: NextRequest) {
         const playerCount = allPlayers?.length || 1
         const prevTurnIndex = (room.current_turn_index - 1 + playerCount) % playerCount
 
-        const { error: roomUpdateError } = await supabase
-            .from('rooms')
-            .update({
-                current_turn_index: prevTurnIndex,
-                tile_bag: restoredBag,
-                turn_started_at: new Date().toISOString()
-            })
-            .eq('room_code', roomCode)
+        // C. Call Atomic RPC
+        const { error: rpcError } = await supabase.rpc('undo_move_atomic', {
+            p_room_code: roomCode,
+            p_move_id: lastMove.id,
+            p_player_id: movePlayer.id,
+            p_points_to_revert: lastMove.points_scored,
+            p_restored_bag: restoredBag,
+            p_prev_turn_index: prevTurnIndex
+        })
 
-        if (roomUpdateError) {
-            console.error("Failed to revert room state")
-            return NextResponse.json({ error: 'Failed to revert room state' }, { status: 500 })
-        }
-
-        // C. Revert Score
-        const newScore = Math.max(0, movePlayer.total_score - lastMove.points_scored)
-        const { error: scoreError } = await supabase
-            .from('players')
-            .update({ total_score: newScore })
-            .eq('id', movePlayer.id)
-
-        if (scoreError) {
-            console.error("CRITICAL: Room reverted but score not reverted")
-            return NextResponse.json({ error: 'Failed to revert score' }, { status: 500 })
-        }
-
-        // D. Delete the move
-        const { error: deleteError } = await supabase
-            .from('moves')
-            .delete()
-            .eq('id', lastMove.id)
-
-        if (deleteError) {
-            console.error("CRITICAL: State reverted but move record remains", lastMove)
-            return NextResponse.json({ error: 'Failed to delete move' }, { status: 500 })
+        if (rpcError) {
+            console.error('Undo RPC error:', rpcError)
+            return NextResponse.json(
+                { error: 'Failed to undo move. Please ensure database migrations are applied.' },
+                { status: 500 }
+            )
         }
 
         return NextResponse.json({ success: true, invertedMove: lastMove })
