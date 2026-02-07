@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         if (roomError) {
             console.error('Room creation error:', roomError)
             return NextResponse.json(
-                { error: 'Failed to create room' },
+                { error: `Failed to create room: ${roomError.message}` },
                 { status: 500 }
             )
         }
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
                 // Clean up room if player creation fails
                 await supabase.from('rooms').delete().eq('room_code', roomCode)
                 return NextResponse.json(
-                    { error: 'Failed to create players' },
+                    { error: `Failed to create players: ${playersError.message}` },
                     { status: 500 }
                 )
             }
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
                 // Clean up room if player creation fails
                 await supabase.from('rooms').delete().eq('room_code', roomCode)
                 return NextResponse.json(
-                    { error: 'Failed to create player' },
+                    { error: `Failed to create player: ${playerError.message}` },
                     { status: 500 }
                 )
             }

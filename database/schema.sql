@@ -4,13 +4,17 @@
 -- Create rooms table
 CREATE TABLE IF NOT EXISTS rooms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  room_code VARCHAR(4) UNIQUE NOT NULL,
+  room_code VARCHAR(10) UNIQUE NOT NULL,
   status VARCHAR(20) DEFAULT 'waiting' CHECK (status IN ('waiting', 'playing', 'finished')),
   current_turn_index INTEGER DEFAULT 0,
   game_mode VARCHAR(20) DEFAULT 'multi-device' CHECK (game_mode IN ('multi-device', 'single-device')),
   turn_timer_enabled BOOLEAN DEFAULT false,
   turn_timer_seconds INTEGER DEFAULT 60 CHECK (turn_timer_seconds >= 10 AND turn_timer_seconds <= 300),
   turn_started_at TIMESTAMPTZ,
+  is_paused BOOLEAN DEFAULT false,
+  tile_bag JSONB DEFAULT '{
+    "A": 9, "B": 2, "C": 2, "D": 4, "E": 12, "F": 2, "G": 3, "H": 2, "I": 9, "J": 1, "K": 1, "L": 4, "M": 2, "N": 6, "O": 8, "P": 2, "Q": 1, "R": 6, "S": 4, "T": 6, "U": 4, "V": 2, "W": 2, "X": 1, "Y": 2, "Z": 1, "BLANK": 2
+  }'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -18,7 +22,7 @@ CREATE TABLE IF NOT EXISTS rooms (
 -- Create players table
 CREATE TABLE IF NOT EXISTS players (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  room_code VARCHAR(4) REFERENCES rooms(room_code) ON DELETE CASCADE,
+  room_code VARCHAR(10) REFERENCES rooms(room_code) ON DELETE CASCADE,
   name VARCHAR(50) NOT NULL,
   total_score INTEGER DEFAULT 0,
   seat_order INTEGER,
@@ -30,11 +34,12 @@ CREATE TABLE IF NOT EXISTS players (
 -- Create moves table
 CREATE TABLE IF NOT EXISTS moves (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  room_code VARCHAR(4) REFERENCES rooms(room_code) ON DELETE CASCADE,
+  room_code VARCHAR(10) REFERENCES rooms(room_code) ON DELETE CASCADE,
   player_id UUID REFERENCES players(id) ON DELETE CASCADE,
   word_played VARCHAR(50),
   points_scored INTEGER DEFAULT 0,
-  move_type VARCHAR(20) CHECK (move_type IN ('word', 'skip', 'swap')),
+  move_type VARCHAR(20) CHECK (move_type IN ('word', 'skip', 'swap', 'end_game')),
+  move_details JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
