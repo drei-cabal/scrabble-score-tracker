@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { addToBag, TileData } from '@/lib/scoring'
 
 export async function POST(request: NextRequest) {
     try {
@@ -73,30 +74,13 @@ export async function POST(request: NextRequest) {
 
         // 5. Execute Undo Operations
 
-        // A. Delete the move
-        const { error: deleteError } = await supabase
-            .from('moves')
-            .delete()
-            .eq('id', lastMove.id)
+        // A. Restore Tile Bag
+        // Flatten all tiles from the move details
+        const details = lastMove.move_details || []
+        const allTiles: TileData[] = (details as any[]).flatMap(d => d.tiles || [])
+        const restoredBag = addToBag(room.tile_bag || {}, allTiles)
 
-        if (deleteError) {
-            return NextResponse.json({ error: 'Failed to delete move' }, { status: 500 })
-        }
-
-        // B. Revert Score
-        const newScore = movePlayer.total_score - lastMove.points_scored
-        const { error: scoreError } = await supabase
-            .from('players')
-            .update({ total_score: newScore })
-            .eq('id', movePlayer.id)
-
-        if (scoreError) {
-            // Major inconsistency potential here if delete succeeded but score failed.
-            console.error("CRITICAL: Move deleted but score not reverted", lastMove)
-            return NextResponse.json({ error: 'Failed to revert score' }, { status: 500 })
-        }
-
-        // C. Revert Turn Index
+        // B. Revert Turn Index & Bag
         // Get total valid players
         const { data: allPlayers } = await supabase
             .from('players')
@@ -105,20 +89,43 @@ export async function POST(request: NextRequest) {
             .eq('role', 'player')
 
         const playerCount = allPlayers?.length || 1
-        // (Current - 1 + Total) % Total
         const prevTurnIndex = (room.current_turn_index - 1 + playerCount) % playerCount
 
-        const { error: turnError } = await supabase
+        const { error: roomUpdateError } = await supabase
             .from('rooms')
             .update({
                 current_turn_index: prevTurnIndex,
+                tile_bag: restoredBag,
                 turn_started_at: new Date().toISOString()
             })
             .eq('room_code', roomCode)
 
-        if (turnError) {
-            console.error("CRITICAL: Score reverted but turn not reverted")
-            return NextResponse.json({ error: 'Failed to revert turn' }, { status: 500 })
+        if (roomUpdateError) {
+            console.error("Failed to revert room state")
+            return NextResponse.json({ error: 'Failed to revert room state' }, { status: 500 })
+        }
+
+        // C. Revert Score
+        const newScore = Math.max(0, movePlayer.total_score - lastMove.points_scored)
+        const { error: scoreError } = await supabase
+            .from('players')
+            .update({ total_score: newScore })
+            .eq('id', movePlayer.id)
+
+        if (scoreError) {
+            console.error("CRITICAL: Room reverted but score not reverted")
+            return NextResponse.json({ error: 'Failed to revert score' }, { status: 500 })
+        }
+
+        // D. Delete the move
+        const { error: deleteError } = await supabase
+            .from('moves')
+            .delete()
+            .eq('id', lastMove.id)
+
+        if (deleteError) {
+            console.error("CRITICAL: State reverted but move record remains", lastMove)
+            return NextResponse.json({ error: 'Failed to delete move' }, { status: 500 })
         }
 
         return NextResponse.json({ success: true, invertedMove: lastMove })

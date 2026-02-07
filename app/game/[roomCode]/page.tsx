@@ -14,6 +14,7 @@ import HowToUseModal from '@/components/modals/HowToUseModal'
 import LobbyView from '@/components/game/LobbyView'
 import PassDeviceOverlay from '@/components/ui/PassDeviceOverlay'
 import TimerSettingsModal from '@/components/modals/TimerSettingsModal'
+import TileBag from '@/components/game/TileBag'
 import { offlineQueue } from '@/lib/offlineQueue'
 
 export default function GamePage() {
@@ -36,6 +37,7 @@ export default function GamePage() {
     const [showAbout, setShowAbout] = useState(false)
     const [showHowToUse, setShowHowToUse] = useState(false)
     const [showTimerSettings, setShowTimerSettings] = useState(false)
+    const [isStarting, setIsStarting] = useState(false)
 
     // Define loadGameData with useCallback so it can be used in useEffect
     const loadGameData = useCallback(async (playerId: string) => {
@@ -288,7 +290,8 @@ export default function GamePage() {
             )
             .subscribe((status) => {
                 console.log('Subscription status:', status)
-                setConnectionStatus(status)
+                // Supabase returns status as a string like 'SUBSCRIBED', 'CHANNEL_ERROR', etc.
+                setConnectionStatus(status as string)
             })
 
         return () => {
@@ -457,7 +460,9 @@ export default function GamePage() {
     }
 
     const handleStartGame = async () => {
-        if (!myPlayerId) return
+        if (!myPlayerId || isStarting) return
+
+        setIsStarting(true)
 
         try {
             const res = await fetch('/api/rooms/start', {
@@ -471,9 +476,18 @@ export default function GamePage() {
                 throw new Error(data.error || 'Failed to start game')
             }
 
-            // Room status will update via realtime subscription
+            // Manually set status to ensure immediate UI update
+            // Realtime will confirm this later
+            if (room) {
+                setRoom({
+                    ...room,
+                    status: 'playing',
+                    turn_started_at: new Date().toISOString()
+                })
+            }
         } catch (err: any) {
             console.error('Failed to start game:', err)
+            setIsStarting(false) // Only reset on error (success keeps it true until view switch)
             alert(err.message)
         }
     }
@@ -578,6 +592,7 @@ export default function GamePage() {
                 isHost={isAdmin}
                 onStartGame={handleStartGame}
                 gameMode={room.game_mode}
+                isStarting={isStarting}
             />
         )
     }
@@ -816,6 +831,7 @@ export default function GamePage() {
                             />
                         )
                     }
+                    {room && <TileBag bag={room.tile_bag || {}} />}
                     <LiveLeaderboard players={players} />
                 </div >
 

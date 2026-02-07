@@ -22,6 +22,7 @@ export interface Room {
     turn_timer_seconds: number
     turn_started_at: string | null
     is_paused: boolean
+    tile_bag: Record<string, number>
     created_at: string
     updated_at: string
 }
@@ -43,6 +44,7 @@ export interface Move {
     word_played: string | null
     points_scored: number
     move_type: 'word' | 'skip' | 'swap' | 'end_game'
+    move_details: any | null
     created_at: string
 }
 

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { subtractFromBag, TileData } from '@/lib/scoring'
 
 export async function POST(request: NextRequest) {
     try {
-        const { roomCode, playerId, word, points } = await request.json()
+        const { roomCode, playerId, word, points, details = [] } = await request.json()
 
         if (!roomCode || !playerId || !word || points === undefined) {
             return NextResponse.json(
@@ -81,9 +82,7 @@ export async function POST(request: NextRequest) {
 
         const playerCount = allPlayers.length
 
-        // Execute transaction: insert move, update score, advance turn
-        // Note: Supabase doesn't support true transactions in the client library
-        // We'll do sequential operations with error handling
+        // Execute transaction-like operations
 
         // 1. Insert move
         const { error: moveError } = await supabase
@@ -94,6 +93,7 @@ export async function POST(request: NextRequest) {
                 word_played: word.trim().toUpperCase(),
                 points_scored: points,
                 move_type: 'word',
+                move_details: details,
             })
 
         if (moveError) {
@@ -118,9 +118,17 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // 3. Advance turn and reset timer
+        // 3. Update Tile Bag
+        // Flatten all tiles from all words in the turn
+        const allTiles: TileData[] = (details as any[]).flatMap(d => d.tiles || [])
+        const newBag = subtractFromBag(room.tile_bag || {}, allTiles)
+
+        // 4. Advance turn and reset timer
         const nextTurnIndex = (room.current_turn_index + 1) % playerCount
-        const updateData: any = { current_turn_index: nextTurnIndex }
+        const updateData: any = {
+            current_turn_index: nextTurnIndex,
+            tile_bag: newBag
+        }
 
         // Reset timer if enabled
         if (room.turn_timer_enabled) {

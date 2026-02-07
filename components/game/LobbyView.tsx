@@ -8,9 +8,10 @@ interface LobbyViewProps {
     isHost: boolean
     onStartGame: () => void
     gameMode: 'multi-device' | 'single-device'
+    isStarting?: boolean
 }
 
-export default function LobbyView({ roomCode, players, isHost, onStartGame, gameMode }: LobbyViewProps) {
+export default function LobbyView({ roomCode, players, isHost, onStartGame, gameMode, isStarting = false }: LobbyViewProps) {
     // Sort players by join order (created_at)
     const sortedPlayers = [...players].sort((a, b) =>
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -76,10 +77,11 @@ export default function LobbyView({ roomCode, players, isHost, onStartGame, game
                 {isHost && (
                     <button
                         onClick={onStartGame}
-                        disabled={!canStart}
-                        className="btn-primary w-full py-4 text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!canStart || isStarting}
+                        className="btn-primary w-full py-4 text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                        {canStart ? 'Start Game' : 'Need at least 2 players'}
+                        {isStarting && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>}
+                        {isStarting ? 'Starting Game...' : (canStart ? 'Start Game' : 'Need at least 2 players')}
                     </button>
                 )}
 
