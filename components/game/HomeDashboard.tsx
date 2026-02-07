@@ -183,9 +183,12 @@ export default function HomeDashboard() {
                 playerId: data.playerId,
                 roomCode: roomCode.trim().toUpperCase(),
                 playerName: playerName.trim(),
+                role: data.role,
             }
 
-            if (data.isSingleDevice) {
+            // Only enable single-device mode for active players (or the host device)
+            // Spectators should see the standard view without shared controls
+            if (data.isSingleDevice && data.role !== 'spectator') {
                 sessionData.isSingleDevice = true
                 sessionData.hostPlayerId = data.hostPlayerId
                 sessionData.gameMode = 'single-device'

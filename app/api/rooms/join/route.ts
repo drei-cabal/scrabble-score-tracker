@@ -68,18 +68,30 @@ export async function POST(request: NextRequest) {
         const isGameInProgress = room.status === 'playing' || room.status === 'finished'
         const playerCount = players?.length || 0
 
-        // Determine role:
-        // - Force spectator if user requested it
-        // - Force spectator if room is full (>= 4 players)
-        // - Force spectator if game is already in progress
-        // - Force spectator if Single Device mode (prevent remote players joining as active players)
-        const shouldBeSpectator =
-            forceSpectator ||
-            playerCount >= 4 ||
-            isGameInProgress ||
-            room.game_mode === 'single-device'
+        // Strict Check: Require explicit 'forceSpectator' for late joins or single-device remote joins
+        // This prevents unintentional joins as active players or confusing state
+        if (!forceSpectator) {
+            if (room.game_mode === 'single-device') {
+                return NextResponse.json(
+                    { error: 'Single-device mode. Please join as Spectator.' },
+                    { status: 409 }
+                )
+            }
+            if (isGameInProgress) {
+                return NextResponse.json(
+                    { error: 'Game in progress. Please join as Spectator.' },
+                    { status: 409 }
+                )
+            }
+            if (playerCount >= 4) {
+                return NextResponse.json(
+                    { error: 'Room is full. Please join as Spectator.' },
+                    { status: 409 }
+                )
+            }
+        }
 
-        const role = shouldBeSpectator ? 'spectator' : 'player'
+        const role = forceSpectator ? 'spectator' : 'player'
 
         // Assign seat order based on join order (created_at timestamp)
         // For players, seat_order is determined by their position in the join sequence
