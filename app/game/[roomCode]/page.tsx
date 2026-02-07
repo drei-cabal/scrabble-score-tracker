@@ -40,6 +40,7 @@ export default function GamePage() {
     const [showTimerSettings, setShowTimerSettings] = useState(false)
     const [isStarting, setIsStarting] = useState(false)
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const [activeMobileTab, setActiveMobileTab] = useState<'play' | 'board' | 'history'>('play')
 
     // Define loadGameData with useCallback so it can be used in useEffect
     const loadGameData = useCallback(async (playerId: string) => {
@@ -904,10 +905,11 @@ export default function GamePage() {
             </header>
 
 
-            {/* Main Grid */}
-            <div className="flex flex-col lg:grid lg:grid-cols-3 gap-3 md:gap-6">
-                {/* Left Column - Order 2 on mobile */}
-                <div className="space-y-3 md:space-y-6 order-2 lg:order-none">
+            {/* Main Grid - Mobile Tabs / Desktop Grid */}
+            <div className="flex flex-col lg:grid lg:grid-cols-3 gap-3 md:gap-6 pb-20 md:pb-0">
+
+                {/* Left Column - Board Info */}
+                <div className={`${activeMobileTab === 'board' ? 'block' : 'hidden'} lg:block space-y-3 md:space-y-6 order-2 lg:order-none`}>
                     {/* Show Current Turn FIRST on mobile to give context */}
                     {
                         currentTurnPlayer && room && (
@@ -920,30 +922,48 @@ export default function GamePage() {
                     }
                     {room && <TileBag bag={room.tile_bag || INITIAL_TILE_DISTRIBUTION} />}
                     <LiveLeaderboard players={players} />
-                </div >
+                </div>
 
-                {/* Middle Column - Order 3 on mobile */}
-                < div className="order-3 lg:order-none" >
+                {/* Middle Column - History */}
+                <div className={`${activeMobileTab === 'history' ? 'block' : 'hidden'} lg:block order-3 lg:order-none`}>
                     <RecentWords moves={moves} players={players} />
-                </div >
+                </div>
 
-                {/* Right Column - Order 1 on mobile (Input first) */}
-                <div className="space-y-3 md:space-y-6 order-1 lg:order-none">
+                {/* Right Column - Play Area */}
+                <div className={`${activeMobileTab === 'play' ? 'block' : 'hidden'} lg:block space-y-6 order-1 lg:order-none`}>
                     {room?.status === 'finished' ? (
                         /* End Game View */
                         renderEndGameView()
                     ) : (
                         /* Normal Game Play */
-                        (isSingleDevice ? currentTurnPlayer : currentPlayer) && (
-                            <SubmitWordForm
-                                roomCode={roomCode}
-                                playerId={(isSingleDevice && currentTurnPlayer?.id) || currentPlayer?.id || ''}
-                                hostId={isSingleDevice ? currentPlayer?.id : undefined}
-                                isMyTurn={isMyTurn}
-                                isSpectator={currentPlayer?.role === 'spectator'}
-                                isHost={isAdmin}
-                            />
-                        )
+                        <>
+                            {/* Mobile Only Current Turn for Play Tab */}
+                            <div className="lg:hidden mb-4">
+                                {currentTurnPlayer && room && (
+                                    <CurrentTurn
+                                        player={currentTurnPlayer}
+                                        room={room}
+                                        onTimerExpired={handleTimerExpired}
+                                    />
+                                )}
+                            </div>
+
+                            {(currentPlayer?.role as string) !== 'spectator' ? (
+                                <SubmitWordForm
+                                    roomCode={roomCode}
+                                    playerId={(isSingleDevice && currentTurnPlayer?.id) || currentPlayer?.id || ''}
+                                    hostId={isSingleDevice ? currentPlayer?.id : undefined}
+                                    isMyTurn={isMyTurn}
+                                    isSpectator={(currentPlayer?.role as string) === 'spectator'}
+                                    isHost={isAdmin}
+                                />
+                            ) : (
+                                <div className="p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg text-center">
+                                    <p className="text-blue-200 font-semibold mb-2">Spectator Mode</p>
+                                    <p className="text-sm text-blue-300/80">You are watching the game.</p>
+                                </div>
+                            )}
+                        </>
                     )
                     }
                 </div>
@@ -958,6 +978,35 @@ export default function GamePage() {
                 onClose={() => handleCloseTimerSettings(false)}
                 onUpdate={handleUpdateTimer}
             />
+
+            {/* Mobile Bottom Navigation */}
+            <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-white/10 p-2 md:hidden z-40 pb-safe">
+                <div className="flex justify-around items-center">
+                    <button
+                        onClick={() => setActiveMobileTab('play')}
+                        className={`flex flex-col items-center p-2 rounded-lg transition-colors w-full ${activeMobileTab === 'play' ? 'text-primary bg-white/5' : 'text-text-muted hover:text-white'}`}
+                    >
+                        <svg className="w-6 h-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span className="text-xs font-bold">Play</span>
+                    </button>
+
+                    <button
+                        onClick={() => setActiveMobileTab('board')}
+                        className={`flex flex-col items-center p-2 rounded-lg transition-colors w-full ${activeMobileTab === 'board' ? 'text-primary bg-white/5' : 'text-text-muted hover:text-white'}`}
+                    >
+                        <svg className="w-6 h-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                        <span className="text-xs font-bold">Board</span>
+                    </button>
+
+                    <button
+                        onClick={() => setActiveMobileTab('history')}
+                        className={`flex flex-col items-center p-2 rounded-lg transition-colors w-full ${activeMobileTab === 'history' ? 'text-primary bg-white/5' : 'text-text-muted hover:text-white'}`}
+                    >
+                        <svg className="w-6 h-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span className="text-xs font-bold">History</span>
+                    </button>
+                </div>
+            </div>
         </div>
     )
 }
