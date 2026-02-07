@@ -29,32 +29,6 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Check if room is single-device mode
-        if (room.game_mode === 'single-device') {
-            // Only allow joining if explicitly requesting spectator mode
-            if (!forceSpectator) {
-                // Allow "Remote Control" / Recovery
-                // Fetch the host player to allow controlling the game from a new device
-                const { data: hostPlayer } = await supabase
-                    .from('players')
-                    .select('*')
-                    .eq('room_code', trimmedCode)
-                    .eq('seat_order', 0)
-                    .single()
-
-                if (hostPlayer) {
-                    return NextResponse.json({
-                        playerId: hostPlayer.id, // Use host ID as the active session ID
-                        role: 'player',
-                        gameMode: 'single-device',
-                        isSingleDevice: true,
-                        hostPlayerId: hostPlayer.id,
-                        message: 'Recovered single-device session.',
-                    })
-                }
-            }
-        }
-
         // Check if name is already taken in this room
         const { data: existingPlayer } = await supabase
             .from('players')
@@ -68,6 +42,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({
                 playerId: existingPlayer.id,
                 role: existingPlayer.role,
+                isSingleDevice: room.game_mode === 'single-device',
+                hostPlayerId: room.host_id, // Useful for single-device checks
                 message: 'Welcome back! Rejoined successfully.',
             })
         }
@@ -88,9 +64,22 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Determine role: player if < 4 players and not forcing spectator
+        // Determine if game is already in progress
+        const isGameInProgress = room.status === 'playing' || room.status === 'finished'
         const playerCount = players?.length || 0
-        const role = forceSpectator || playerCount >= 4 ? 'spectator' : 'player'
+
+        // Determine role:
+        // - Force spectator if user requested it
+        // - Force spectator if room is full (>= 4 players)
+        // - Force spectator if game is already in progress
+        // - Force spectator if Single Device mode (prevent remote players joining as active players)
+        const shouldBeSpectator =
+            forceSpectator ||
+            playerCount >= 4 ||
+            isGameInProgress ||
+            room.game_mode === 'single-device'
+
+        const role = shouldBeSpectator ? 'spectator' : 'player'
 
         // Assign seat order based on join order (created_at timestamp)
         // For players, seat_order is determined by their position in the join sequence
@@ -117,12 +106,20 @@ export async function POST(request: NextRequest) {
             )
         }
 
+        // Generate appropriate welcome message
+        let message = ''
+        if (role === 'spectator') {
+            if (playerCount >= 4) message = 'Room is full. You joined as a spectator.'
+            else if (isGameInProgress) message = 'Game in progress. You joined as a spectator.'
+            else if (room.game_mode === 'single-device') message = 'Single-Device room. Remote access is spectator only.'
+            else message = 'Joined as spectator.'
+        }
+
         return NextResponse.json({
             playerId: newPlayer.id,
             role: newPlayer.role,
-            message: role === 'spectator' && playerCount >= 4
-                ? 'Room is full. You joined as a spectator.'
-                : undefined,
+            isSingleDevice: room.game_mode === 'single-device',
+            message: message || undefined,
         })
     } catch (error) {
         console.error('Join room error:', error)

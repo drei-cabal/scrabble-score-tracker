@@ -17,6 +17,7 @@ import TimerSettingsModal from '@/components/modals/TimerSettingsModal'
 import TileBag from '@/components/game/TileBag'
 import { offlineQueue } from '@/lib/offlineQueue'
 import { INITIAL_TILE_DISTRIBUTION } from '@/lib/scoring'
+import ShareButton from '@/components/game/ShareButton'
 
 export default function GamePage() {
     const params = useParams()
@@ -103,48 +104,14 @@ export default function GamePage() {
                 return
             }
 
-            // If no valid session, try to recover SINGLE DEVICE game
-            try {
-                // Check if room exists and is single-device
-                const { data: roomCheck } = await supabase
-                    .from('rooms')
-                    .select('game_mode')
-                    .eq('room_code', roomCode)
-                    .single()
 
-                if (roomCheck && roomCheck.game_mode === 'single-device') {
-                    console.log('Recovering Single Device Session...')
+            // Validation: Only restore session if explicitly stored.
+            // We removed the logic that auto-logged in as host for single-device rooms
+            // because it allowed anyone with the link to become host.
+            // New users will fall through to redirect.
 
-                    // Fetch host player to impersonate/resume
-                    const { data: hostPlayer } = await supabase
-                        .from('players')
-                        .select('id')
-                        .eq('room_code', roomCode)
-                        .eq('seat_order', 0)
-                        .single()
-
-                    if (hostPlayer) {
-                        // Create new session
-                        const newSession = {
-                            roomCode,
-                            gameMode: 'single-device',
-                            hostPlayerId: hostPlayer.id,
-                            isSingleDevice: true
-                        }
-                        localStorage.setItem('scrabble_session', JSON.stringify(newSession))
-
-                        setIsSingleDevice(true)
-                        setMyPlayerId(hostPlayer.id)
-                        loadGameData(hostPlayer.id)
-                        return
-                    }
-                }
-            } catch (err) {
-                console.error('Recovery attempt failed:', err)
-            }
-
-            // If recovery failed, back to home
-            router.push('/')
+            // If recovery failed, back to home with code pre-filled
+            router.push(`/?code=${roomCode}`)
         }
 
         initializeGame()
@@ -729,8 +696,14 @@ export default function GamePage() {
                             {connectionStatus === 'SUBSCRIBED' ? '● Live' : '○ Connecting...'}
                         </div>
 
-                        {/* Desktop Buttons (Hidden on Mobile) */}
-                        <div className="hidden md:flex gap-2 items-center">
+                        {/* Header Actions (Desktop) */}
+                        <div className="hidden md:flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <div className="text-xl font-bold bg-white/10 px-4 py-1.5 rounded-lg border border-white/20 tracking-widest shadow-inner">
+                                    {roomCode}
+                                </div>
+                                <ShareButton roomCode={roomCode} variant="icon" />
+                            </div>
                             {isAdmin && room?.status === 'playing' && room?.turn_timer_enabled && (
                                 <button
                                     onClick={handleOpenTimerSettings}
@@ -799,100 +772,110 @@ export default function GamePage() {
 
                 {/* Mobile Menu Dropdown */}
                 {isMobileMenuOpen && (
-                    <div className="absolute top-full right-0 mt-2 w-56 bg-card border border-white/10 rounded-xl shadow-2xl p-2 flex flex-col gap-1 md:hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right overflow-hidden">
-                        {isAdmin && room?.status === 'playing' && (
+                    <div className="absolute top-full right-0 mt-2 w-56 bg-surface border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
+                        <div className="p-2 border-b border-white/5">
+                            <p className="text-xs text-text-muted px-2 mb-1">Room Code</p>
+                            <div className="flex items-center justify-between px-2 py-1 bg-white/5 rounded">
+                                <span className="font-mono font-bold tracking-widest">{roomCode}</span>
+                                <ShareButton roomCode={roomCode} variant="icon" className="!p-1" />
+                            </div>
+                        </div>
+
+                        <div className="p-2 space-y-1">
+                            {isAdmin && room?.status === 'playing' && (
+                                <button
+                                    onClick={() => {
+                                        handlePauseGame()
+                                        setIsMobileMenuOpen(false)
+                                    }}
+                                    className={`w-full text-left px-4 py-3 rounded-lg font-semibold flex items-center gap-3 ${room.is_paused
+                                        ? 'bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30'
+                                        : 'hover:bg-white/5 text-gray-300'}`}
+                                >
+                                    {room.is_paused ? (
+                                        <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Resume Game</>
+                                    ) : (
+                                        <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Pause Game</>
+                                    )}
+                                </button>
+                            )}
+
+                            {isAdmin && room?.status === 'playing' && room?.turn_timer_enabled && (
+                                <button
+                                    onClick={() => {
+                                        handleOpenTimerSettings()
+                                        setIsMobileMenuOpen(false)
+                                    }}
+                                    className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-gray-300 font-semibold flex items-center gap-3"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    Timer Settings
+                                </button>
+                            )}
+
+                            {isAdmin && room?.status === 'playing' && (
+                                <button
+                                    onClick={() => {
+                                        handleEndGame()
+                                        setIsMobileMenuOpen(false)
+                                    }}
+                                    className="w-full text-left px-4 py-3 rounded-lg hover:bg-purple-500/10 text-purple-300 font-semibold flex items-center gap-3"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    End Game
+                                </button>
+                            )}
+
+                            {isAdmin && (
+                                <button
+                                    onClick={() => {
+                                        handleDeleteRoom()
+                                        setIsMobileMenuOpen(false)
+                                    }}
+                                    className="w-full text-left px-4 py-3 rounded-lg hover:bg-red-500/10 text-red-300 font-semibold flex items-center gap-3"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    Delete Room
+                                </button>
+                            )}
+
+                            <div className="h-px bg-white/10 my-1"></div>
+
                             <button
                                 onClick={() => {
-                                    handlePauseGame()
+                                    setShowAbout(true)
                                     setIsMobileMenuOpen(false)
                                 }}
-                                className={`w-full text-left px-4 py-3 rounded-lg font-semibold flex items-center gap-3 ${room.is_paused
-                                    ? 'bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30'
-                                    : 'hover:bg-white/5 text-gray-300'}`}
+                                className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-gray-400 font-semibold flex items-center gap-3"
                             >
-                                {room.is_paused ? (
-                                    <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Resume Game</>
-                                ) : (
-                                    <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Pause Game</>
-                                )}
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                About
                             </button>
-                        )}
 
-                        {isAdmin && room?.status === 'playing' && room?.turn_timer_enabled && (
                             <button
                                 onClick={() => {
-                                    handleOpenTimerSettings()
+                                    setShowHowToUse(true)
                                     setIsMobileMenuOpen(false)
                                 }}
-                                className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-gray-300 font-semibold flex items-center gap-3"
+                                className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-gray-400 font-semibold flex items-center gap-3"
                             >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                Timer Settings
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                How To Use
                             </button>
-                        )}
 
-                        {isAdmin && room?.status === 'playing' && (
+                            <div className="h-px bg-white/10 my-1"></div>
+
                             <button
                                 onClick={() => {
-                                    handleEndGame()
+                                    handleLeaveRoom()
                                     setIsMobileMenuOpen(false)
                                 }}
-                                className="w-full text-left px-4 py-3 rounded-lg hover:bg-purple-500/10 text-purple-300 font-semibold flex items-center gap-3"
+                                className="w-full text-left px-4 py-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-200 font-semibold flex items-center gap-3"
                             >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                End Game
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                                Leave Room
                             </button>
-                        )}
-
-                        {isAdmin && (
-                            <button
-                                onClick={() => {
-                                    handleDeleteRoom()
-                                    setIsMobileMenuOpen(false)
-                                }}
-                                className="w-full text-left px-4 py-3 rounded-lg hover:bg-red-500/10 text-red-300 font-semibold flex items-center gap-3"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                Delete Room
-                            </button>
-                        )}
-
-                        <div className="h-px bg-white/10 my-1"></div>
-
-                        <button
-                            onClick={() => {
-                                setShowAbout(true)
-                                setIsMobileMenuOpen(false)
-                            }}
-                            className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-gray-400 font-semibold flex items-center gap-3"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            About
-                        </button>
-
-                        <button
-                            onClick={() => {
-                                setShowHowToUse(true)
-                                setIsMobileMenuOpen(false)
-                            }}
-                            className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-gray-400 font-semibold flex items-center gap-3"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            How To Use
-                        </button>
-
-                        <div className="h-px bg-white/10 my-1"></div>
-
-                        <button
-                            onClick={() => {
-                                handleLeaveRoom()
-                                setIsMobileMenuOpen(false)
-                            }}
-                            className="w-full text-left px-4 py-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-200 font-semibold flex items-center gap-3"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                            Leave Room
-                        </button>
+                        </div>
                     </div>
                 )}
 

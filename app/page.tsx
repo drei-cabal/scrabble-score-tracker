@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import AboutModal from '@/components/modals/AboutModal'
 import HowToUseModal from '@/components/modals/HowToUseModal'
 
@@ -23,6 +23,18 @@ export default function Home() {
     const [showAbout, setShowAbout] = useState(false)
     const [showHowToUse, setShowHowToUse] = useState(false)
     const router = useRouter()
+    const searchParams = useSearchParams()
+
+    // Handle URL code parameter (for shared links)
+    useEffect(() => {
+        const code = searchParams.get('code')
+        if (code) {
+            setRoomCode(code.toUpperCase())
+            setActiveTab('join')
+            // Clean URL without reload
+            window.history.replaceState({}, '', '/')
+        }
+    }, [searchParams])
 
 
 

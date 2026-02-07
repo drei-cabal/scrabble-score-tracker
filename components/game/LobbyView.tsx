@@ -1,6 +1,7 @@
 'use client'
 
 import { Player } from '@/lib/supabase'
+import ShareButton from './ShareButton'
 
 interface LobbyViewProps {
     roomCode: string
@@ -24,9 +25,13 @@ export default function LobbyView({ roomCode, players, isHost, onStartGame, game
             <div className="card max-w-2xl w-full p-6 md:p-8">
                 <div className="text-center mb-8">
                     <h1 className="text-3xl md:text-4xl font-bold mb-2">Game Lobby</h1>
-                    <div className="inline-block bg-secondary px-6 py-3 rounded-lg">
-                        <p className="text-sm text-text-muted mb-1">Room Code</p>
-                        <p className="text-3xl font-bold tracking-wider">{roomCode}</p>
+                    <div className="inline-flex items-center gap-4 bg-secondary px-6 py-3 rounded-lg mx-auto">
+                        <div className="text-left">
+                            <p className="text-xs text-text-muted uppercase tracking-wider mb-1">Room Code</p>
+                            <p className="text-3xl font-bold tracking-widest">{roomCode}</p>
+                        </div>
+                        <div className="h-10 w-px bg-white/10"></div>
+                        <ShareButton roomCode={roomCode} variant="icon" />
                     </div>
                     <p className="text-sm text-text-muted mt-4">
                         {gameMode === 'single-device' ? '📱 Single-Device Mode' : '🌐 Multi-Device Mode'}
