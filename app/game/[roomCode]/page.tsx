@@ -39,6 +39,7 @@ export default function GamePage() {
     const [showHowToUse, setShowHowToUse] = useState(false)
     const [showTimerSettings, setShowTimerSettings] = useState(false)
     const [isStarting, setIsStarting] = useState(false)
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
     // Define loadGameData with useCallback so it can be used in useEffect
     const loadGameData = useCallback(async (playerId: string) => {
@@ -710,113 +711,198 @@ export default function GamePage() {
                 confirmText="End Game Now"
                 isDanger={true}
             />
-            {/* Header - Compact on mobile */}
-            <header className="mb-3 md:mb-6">
+            {/* Header - Responsive with Mobile Menu */}
+            <header className="mb-3 md:mb-6 relative z-50">
                 <div className="flex items-center justify-between mb-2">
                     <div>
                         <h1 className="text-xl md:text-3xl font-bold text-primary">SCRABBLE</h1>
                         <p className="text-xs md:text-sm text-text-muted">Room: {roomCode}</p>
                     </div>
-                    <div className="flex gap-1 md:gap-2 items-center">
-                        <div className={`px-2 md:px-3 py-1 rounded-full text-xs font-semibold ${connectionStatus === 'SUBSCRIBED'
+
+                    <div className="flex items-center gap-2">
+                        {/* Live Indicator - Always Visible */}
+                        <div className={`px-2 md:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${connectionStatus === 'SUBSCRIBED'
                             ? 'bg-green-500/20 text-green-400 border border-green-500/50'
                             : 'bg-red-500/20 text-red-400 border border-red-500/50'
                             }`}>
                             {connectionStatus === 'SUBSCRIBED' ? '● Live' : '○ Connecting...'}
                         </div>
 
-                        {/* Timer Settings Button */}
-                        {isAdmin && room?.status === 'playing' && room?.turn_timer_enabled && (
+                        {/* Desktop Buttons (Hidden on Mobile) */}
+                        <div className="hidden md:flex gap-2 items-center">
+                            {isAdmin && room?.status === 'playing' && room?.turn_timer_enabled && (
+                                <button
+                                    onClick={handleOpenTimerSettings}
+                                    className="px-3 py-2 rounded-lg transition-all font-semibold text-sm flex items-center gap-1 bg-gray-700/50 text-gray-300 border border-gray-600 hover:bg-gray-700"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    Timer
+                                </button>
+                            )}
+
+                            {/* Pause Button - Host Only */}
+                            {isAdmin && room?.status === 'playing' && (
+                                <button
+                                    onClick={handlePauseGame}
+                                    className={`px-3 py-2 rounded-lg transition-all font-semibold text-sm flex items-center gap-1 ${room.is_paused
+                                        ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 hover:bg-yellow-500/30'
+                                        : 'bg-gray-700/50 text-gray-300 border border-gray-600 hover:bg-gray-700'
+                                        }`}
+                                >
+                                    {room.is_paused ? 'Resume' : 'Pause'}
+                                </button>
+                            )}
+
+                            {isAdmin && room?.status === 'playing' && (
+                                <button
+                                    onClick={handleEndGame}
+                                    className="px-3 py-2 bg-purple-900/50 text-purple-200 border border-purple-800 rounded-lg hover:bg-purple-900 transition-all font-semibold text-sm"
+                                >
+                                    End Game
+                                </button>
+                            )}
+
+                            {isAdmin && (
+                                <button
+                                    onClick={handleDeleteRoom}
+                                    className="px-3 py-2 bg-red-900/50 text-red-200 border border-red-800 rounded-lg hover:bg-red-900 transition-all font-semibold text-sm flex items-center gap-1"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    Delete
+                                </button>
+                            )}
+
                             <button
-                                onClick={handleOpenTimerSettings}
-                                className="px-2 md:px-3 py-1 md:py-2 rounded-lg transition-all font-semibold text-xs md:text-sm flex items-center gap-1 bg-gray-700/50 text-gray-300 border border-gray-600 hover:bg-gray-700"
-                                title="Adjust Timer"
+                                onClick={handleLeaveRoom}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-semibold text-base"
                             >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span className="hidden md:inline">Timer</span>
+                                Leave
+                            </button>
+                        </div>
+
+                        {/* Mobile Menu Toggle */}
+                        <button
+                            className="md:hidden p-2 text-text-muted hover:text-white bg-card border border-white/10 rounded-lg"
+                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                {isMobileMenuOpen ? (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                ) : (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                )}
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Mobile Menu Dropdown */}
+                {isMobileMenuOpen && (
+                    <div className="absolute top-full right-0 mt-2 w-56 bg-card border border-white/10 rounded-xl shadow-2xl p-2 flex flex-col gap-1 md:hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right overflow-hidden">
+                        {isAdmin && room?.status === 'playing' && (
+                            <button
+                                onClick={() => {
+                                    handlePauseGame()
+                                    setIsMobileMenuOpen(false)
+                                }}
+                                className={`w-full text-left px-4 py-3 rounded-lg font-semibold flex items-center gap-3 ${room.is_paused
+                                    ? 'bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30'
+                                    : 'hover:bg-white/5 text-gray-300'}`}
+                            >
+                                {room.is_paused ? (
+                                    <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Resume Game</>
+                                ) : (
+                                    <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Pause Game</>
+                                )}
                             </button>
                         )}
 
-                        {/* Pause Button */}
-                        {room?.status === 'playing' && (
+                        {isAdmin && room?.status === 'playing' && room?.turn_timer_enabled && (
                             <button
-                                onClick={handlePauseGame}
-                                className={`px-2 md:px-3 py-1 md:py-2 rounded-lg transition-all font-semibold text-xs md:text-sm flex items-center gap-1 ${room.is_paused
-                                    ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 hover:bg-yellow-500/30'
-                                    : 'bg-gray-700/50 text-gray-300 border border-gray-600 hover:bg-gray-700'
-                                    }`}
-                                title={room.is_paused ? "Resume Game" : "Pause Game"}
+                                onClick={() => {
+                                    handleOpenTimerSettings()
+                                    setIsMobileMenuOpen(false)
+                                }}
+                                className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-gray-300 font-semibold flex items-center gap-3"
                             >
-                                {room.is_paused ? (
-                                    <>
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <span className="hidden md:inline">Resume</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <span className="hidden md:inline">Pause</span>
-                                    </>
-                                )}
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                Timer Settings
                             </button>
                         )}
 
                         {isAdmin && room?.status === 'playing' && (
                             <button
-                                onClick={handleEndGame}
-                                className="px-2 md:px-3 py-1 md:py-2 bg-purple-900/50 text-purple-200 border border-purple-800 rounded-lg hover:bg-purple-900 transition-all font-semibold text-xs md:text-sm flex items-center gap-1"
-                                title="End Game"
+                                onClick={() => {
+                                    handleEndGame()
+                                    setIsMobileMenuOpen(false)
+                                }}
+                                className="w-full text-left px-4 py-3 rounded-lg hover:bg-purple-500/10 text-purple-300 font-semibold flex items-center gap-3"
                             >
-                                <span className="md:hidden font-bold">End</span>
-                                <span className="hidden md:inline">End Game</span>
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                End Game
                             </button>
                         )}
 
                         {isAdmin && (
                             <button
-                                onClick={handleDeleteRoom}
-                                className="px-2 md:px-4 py-1 md:py-2 bg-red-900/50 text-red-200 border border-red-800 rounded-lg hover:bg-red-900 transition-all font-semibold text-xs md:text-sm flex items-center gap-1"
-                                title="Delete Room"
+                                onClick={() => {
+                                    handleDeleteRoom()
+                                    setIsMobileMenuOpen(false)
+                                }}
+                                className="w-full text-left px-4 py-3 rounded-lg hover:bg-red-500/10 text-red-300 font-semibold flex items-center gap-3"
                             >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                                <span className="hidden md:inline">Delete</span>
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                Delete Room
                             </button>
                         )}
+
+                        <div className="h-px bg-white/10 my-1"></div>
+
                         <button
-                            onClick={handleLeaveRoom}
-                            className="px-2 md:px-4 py-1 md:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all font-semibold text-xs md:text-base"
+                            onClick={() => {
+                                setShowAbout(true)
+                                setIsMobileMenuOpen(false)
+                            }}
+                            className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-gray-400 font-semibold flex items-center gap-3"
                         >
-                            Leave
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            About
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                setShowHowToUse(true)
+                                setIsMobileMenuOpen(false)
+                            }}
+                            className="w-full text-left px-4 py-3 rounded-lg hover:bg-white/5 text-gray-400 font-semibold flex items-center gap-3"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            How To Use
+                        </button>
+
+                        <div className="h-px bg-white/10 my-1"></div>
+
+                        <button
+                            onClick={() => {
+                                handleLeaveRoom()
+                                setIsMobileMenuOpen(false)
+                            }}
+                            className="w-full text-left px-4 py-3 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-200 font-semibold flex items-center gap-3"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                            Leave Room
                         </button>
                     </div>
-                </div>
+                )}
 
-                {/* Help Links - Below room info */}
-                <div className="flex items-center gap-3 text-xs">
-                    <button
-                        onClick={() => setShowAbout(true)}
-                        className="text-white/50 hover:text-primary transition-colors underline-offset-2 hover:underline"
-                    >
-                        About
-                    </button>
+                {/* Desktop Help Links */}
+                <div className="hidden md:flex items-center gap-3 text-xs mt-2">
+                    <button onClick={() => setShowAbout(true)} className="text-white/50 hover:text-primary transition-colors hover:underline">About</button>
                     <span className="text-white/30">•</span>
-                    <button
-                        onClick={() => setShowHowToUse(true)}
-                        className="text-white/50 hover:text-primary transition-colors underline-offset-2 hover:underline"
-                    >
-                        How To Use
-                    </button>
+                    <button onClick={() => setShowHowToUse(true)} className="text-white/50 hover:text-primary transition-colors hover:underline">How To Use</button>
                 </div>
             </header>
+
 
             {/* Main Grid */}
             <div className="flex flex-col lg:grid lg:grid-cols-3 gap-3 md:gap-6">
