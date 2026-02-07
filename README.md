@@ -144,29 +144,32 @@ If your browser crashes or you accidentally close the tab:
 ```
 scrabble-game/
 ├── app/
-│   ├── api/
-│   │   ├── rooms/
-│   │   │   ├── create/route.ts    # Create room API
-│   │   │   └── join/route.ts      # Join room API
-│   │   └── moves/
-│   │       ├── submit/route.ts    # Submit word API
-│   │       ├── skip/route.ts      # Skip turn API
-│   │       └── swap/route.ts      # Swap tiles API
-│   ├── game/[roomCode]/
-│   │   └── page.tsx               # Game dashboard
-│   ├── layout.tsx                 # Root layout
-│   ├── page.tsx                   # Landing page
-│   └── globals.css                # Global styles
+│   ├── api/                     # API Routes
+│   │   ├── rooms/               # Room management
+│   │   └── moves/               # Gameplay actions
+│   ├── game/[roomCode]/         # Main game board
+│   ├── layout.tsx               # Root layout
+│   ├── page.tsx                 # Home/Landing page
+│   └── globals.css              # Global styles
 ├── components/
-│   ├── LiveLeaderboard.tsx        # Leaderboard component
-│   ├── RecentWords.tsx            # Move history feed
-│   ├── CurrentTurn.tsx            # Turn indicator
-│   ├── SubmitWordForm.tsx         # Word submission form
-│   └── PlayerStats.tsx            # Player statistics
-├── lib/
-│   └── supabase.ts                # Supabase client & types
-├── database/
-│   └── schema.sql                 # Database schema
+│   ├── game/                    # Gameplay components
+│   │   ├── LiveLeaderboard.tsx
+│   │   ├── RecentWords.tsx
+│   │   ├── CurrentTurn.tsx
+│   │   ├── SubmitWordForm.tsx
+│   │   └── ...
+│   ├── modals/                  # Modals and overlays
+│   │   ├── AboutModal.tsx
+│   │   ├── ConfirmationModal.tsx
+│   │   └── ...
+│   └── ui/                      # General UI elements
+│       ├── Footer.tsx
+│       └── ...
+├── lib/                         # Shared utilities
+├── database/                    # SQL schema & migrations
+│   ├── migrations/              # Incremental updates
+│   └── schema.sql               # Base schema
+├── docs/                        # Project documentation
 └── package.json
 ```
 
@@ -244,7 +247,6 @@ scrabble-game/
 
 - [ ] Real player statistics tracking
 - [ ] Game history and replays
-- [ ] Timer for turns
 - [ ] Dictionary validation for words
 - [ ] Mobile app version
 - [ ] Tournament mode

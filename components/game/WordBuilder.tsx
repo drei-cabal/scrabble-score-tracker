@@ -92,8 +92,8 @@ export default function WordBuilder({ onAddWord, disabled }: WordBuilderProps) {
             <div>
                 <div className="flex justify-between items-center mb-1">
                     <label className="text-sm font-medium">Construct Word</label>
-                    <span className={`text-xs ${inputText.length === 7 ? 'text-red-400 font-bold' : 'text-text-muted'}`}>
-                        {inputText.length}/7
+                    <span className={`text-xs ${inputText.length === 15 ? 'text-red-400 font-bold' : 'text-text-muted'}`}>
+                        {inputText.length}/15
                     </span>
                 </div>
                 <input
@@ -101,9 +101,9 @@ export default function WordBuilder({ onAddWord, disabled }: WordBuilderProps) {
                     value={inputText}
                     onChange={(e) => {
                         const val = e.target.value.toUpperCase().replace(/[^A-Z]/g, '')
-                        if (val.length <= 7) setInputText(val)
+                        if (val.length <= 15) setInputText(val)
                     }}
-                    maxLength={7}
+                    maxLength={15}
                     placeholder="TYPE HERE..."
                     className="input-field uppercase text-lg tracking-widest font-bold"
                     disabled={disabled}

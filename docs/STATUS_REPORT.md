@@ -8,10 +8,17 @@
 ## ✅ All Issues Fixed
 
 ### 1. Pause Button Fixed
-- **Issue**: "Failed to update game state" error
-- **Root Cause**: Database column `is_paused` doesn't exist yet
 - **Solution**: Migration SQL created and documented
 - **Action Required**: Run the migration (see below)
+
+### 6. End Game Feature (Feb 5)
+- **Host Action**: "End Game" button added.
+- **Final Scoring**: Players input remaining tiles, system calculates penalty.
+- **Migration**: Added `end_game` to `move_type` check constraint.
+
+### 5. Gameplay Adjustments (Feb 5)
+- **Bingo**: Removed automatic 50pt calculation. Added manual "BINGO" button.
+- **Word Length**: Increased limit from 7 to 15 letters.
 
 ### 2. Pause Overlay Updated
 - **Change**: Button now says "Continue" instead of "Resume Game"
@@ -42,6 +49,10 @@ Before using the pause feature, run this in your Supabase SQL Editor:
 ```sql
 ALTER TABLE rooms ADD COLUMN IF NOT EXISTS is_paused BOOLEAN DEFAULT false;
 CREATE INDEX IF NOT EXISTS idx_rooms_is_paused ON rooms(is_paused);
+
+-- REQUIRED FOR END GAME FEATURE:
+ALTER TABLE moves DROP CONSTRAINT IF EXISTS moves_move_type_check;
+ALTER TABLE moves ADD CONSTRAINT moves_move_type_check CHECK (move_type IN ('word', 'skip', 'swap', 'end_game'));
 ```
 
 **Where to run it:**

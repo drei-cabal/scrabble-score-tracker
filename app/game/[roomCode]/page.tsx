@@ -3,16 +3,17 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase, type Room, type Player, type Move } from '@/lib/supabase'
-import LiveLeaderboard from '@/components/LiveLeaderboard'
-import RecentWords from '@/components/RecentWords'
-import CurrentTurn from '@/components/CurrentTurn'
-import SubmitWordForm from '@/components/SubmitWordForm'
-import ConfirmationModal from '@/components/ConfirmationModal'
-import AboutModal from '@/components/AboutModal'
-import HowToUseModal from '@/components/HowToUseModal'
-import LobbyView from '@/components/LobbyView'
-import PassDeviceOverlay from '@/components/PassDeviceOverlay'
-import TimerSettingsModal from '@/components/TimerSettingsModal'
+import LiveLeaderboard from '@/components/game/LiveLeaderboard'
+import RecentWords from '@/components/game/RecentWords'
+import CurrentTurn from '@/components/game/CurrentTurn'
+import SubmitWordForm from '@/components/game/SubmitWordForm'
+import EndGameForm from '@/components/game/EndGameForm'
+import ConfirmationModal from '@/components/modals/ConfirmationModal'
+import AboutModal from '@/components/modals/AboutModal'
+import HowToUseModal from '@/components/modals/HowToUseModal'
+import LobbyView from '@/components/game/LobbyView'
+import PassDeviceOverlay from '@/components/ui/PassDeviceOverlay'
+import TimerSettingsModal from '@/components/modals/TimerSettingsModal'
 import { offlineQueue } from '@/lib/offlineQueue'
 
 export default function GamePage() {
@@ -31,6 +32,7 @@ export default function GamePage() {
     const [connectionStatus, setConnectionStatus] = useState('CONNECTING')
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
     const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false)
+    const [isEndGameModalOpen, setIsEndGameModalOpen] = useState(false)
     const [showAbout, setShowAbout] = useState(false)
     const [showHowToUse, setShowHowToUse] = useState(false)
     const [showTimerSettings, setShowTimerSettings] = useState(false)
@@ -175,6 +177,32 @@ export default function GamePage() {
         window.addEventListener('moves-updated', handleMovesUpdated)
         return () => window.removeEventListener('moves-updated', handleMovesUpdated)
     }, [myPlayerId, roomCode])
+
+    // Check if I have already finalized (for End Game state)
+    const [hasFinalized, setHasFinalized] = useState(false)
+    const [finalizedPlayerIds, setFinalizedPlayerIds] = useState<Set<string>>(new Set())
+
+    useEffect(() => {
+        if (room?.status === 'finished') {
+            // Fetch ALL end_game moves to know who has finalized
+            const checkFinalizations = async () => {
+                const { data } = await supabase
+                    .from('moves')
+                    .select('player_id')
+                    .eq('room_code', roomCode)
+                    .eq('move_type', 'end_game')
+
+                if (data) {
+                    const finalizedIds = new Set(data.map(m => m.player_id))
+                    setFinalizedPlayerIds(finalizedIds)
+                    if (myPlayerId && finalizedIds.has(myPlayerId)) {
+                        setHasFinalized(true)
+                    }
+                }
+            }
+            checkFinalizations()
+        }
+    }, [room?.status, myPlayerId, roomCode, moves]) // depend on moves to update when new submissions happen
 
     // Subscribe to realtime updates
     useEffect(() => {
@@ -326,6 +354,28 @@ export default function GamePage() {
             alert(err.message)
         } finally {
             setIsDeleteModalOpen(false)
+        }
+    }
+
+    const handleEndGame = () => {
+        setIsEndGameModalOpen(true)
+    }
+
+    const confirmEndGame = async () => {
+        try {
+            const res = await fetch('/api/rooms/end', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomCode, playerId: myPlayerId }),
+            })
+
+            if (!res.ok) throw new Error('Failed to end game')
+
+        } catch (err: any) {
+            console.error('End game error:', err)
+            alert(err.message)
+        } finally {
+            setIsEndGameModalOpen(false)
         }
     }
 
@@ -537,6 +587,59 @@ export default function GamePage() {
         p => p.role === 'player' && p.seat_order === room?.current_turn_index
     )
 
+    const renderEndGameView = () => {
+        // Find the next player who hasn't finalized (only relevant for Single Device mainly)
+        const unfinalizedPlayer = isSingleDevice
+            ? players.find(p => p.role === 'player' && !finalizedPlayerIds.has(p.id))
+            : null
+
+        // Determine if WE should show the form
+        // Single Device: If there is ANY unfinalized player, show form for them
+        // Multi Device: If I haven't finalized, show form for ME
+        const shouldShowForm = isSingleDevice
+            ? !!unfinalizedPlayer
+            : (!hasFinalized && currentPlayer?.role !== 'spectator')
+
+        const playerForForm = isSingleDevice ? unfinalizedPlayer : currentPlayer
+
+        if (shouldShowForm && playerForForm) {
+            return (
+                <EndGameForm
+                    key={playerForForm.id}
+                    roomCode={roomCode}
+                    playerId={playerForForm.id}
+                    playerName={playerForForm.name}
+                    onFinalized={() => {
+                        setHasFinalized(true)
+                        // Trigger refresh of data
+                        loadGameData(myPlayerId!)
+                    }}
+                />
+            )
+        }
+
+        return (
+            <div className="card p-6 text-center space-y-4">
+                <div className="text-4xl">🏁</div>
+                <h2 className="text-xl font-bold">Game Finished!</h2>
+                <p className="text-text-muted">
+                    {currentPlayer?.role === 'spectator'
+                        ? "The game has ended."
+                        : "You have finalized your score."}
+                </p>
+                <div className="text-sm bg-black/20 p-3 rounded">
+                    Check the leaderboard to see the final standings!
+                </div>
+                <button
+                    onClick={isAdmin ? confirmDeleteRoom : () => router.push('/')}
+                    className={`w-full py-2 btn-secondary ${isAdmin ? 'bg-red-900/50 hover:bg-red-900 text-red-200 border-red-800' : ''}`}
+                >
+                    {isAdmin ? 'End Game & Delete Room' : 'Back to Home'}
+                </button>
+            </div>
+        )
+    }
+
     return (
         <div className="min-h-screen p-2 md:p-4">
             {/* Pass Device Overlay (Single-Device Mode Only) */}
@@ -552,18 +655,12 @@ export default function GamePage() {
             {room?.is_paused && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 flex items-center justify-center p-4 animate-in fade-in duration-300">
                     <div className="bg-gradient-to-br from-primary/20 to-secondary border-2 border-primary rounded-2xl p-5 md:p-6 max-w-xs md:max-w-sm w-full text-center shadow-2xl">
-                        <div className="mb-3 md:mb-4">
-                            <svg className="w-10 h-10 md:w-12 md:h-12 mx-auto text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </div>
+
                         <h2 className="text-lg md:text-xl font-bold mb-1 text-white">Game Paused</h2>
                         <p className="text-text-muted text-xs md:text-sm mb-3 md:mb-4">The host has paused the game.</p>
-                        {isAdmin && (
-                            <button onClick={handlePauseGame} className="btn-primary w-full py-2 md:py-2.5 text-sm md:text-base font-bold">
-                                Continue
-                            </button>
-                        )}
+                        <button onClick={handlePauseGame} className="btn-primary w-full py-2 md:py-2.5 text-sm md:text-base font-bold">
+                            Continue
+                        </button>
                     </div>
                 </div>
             )}
@@ -586,6 +683,16 @@ export default function GamePage() {
                 onCancel={() => setIsLeaveModalOpen(false)}
                 confirmText="Leave Game"
                 isDanger={false}
+            />
+
+            <ConfirmationModal
+                isOpen={isEndGameModalOpen}
+                title="End Game?"
+                message="Are you sure you want to end the game? All players will be asked to enter their remaining tiles for final scoring."
+                onConfirm={confirmEndGame}
+                onCancel={() => setIsEndGameModalOpen(false)}
+                confirmText="End Game Now"
+                isDanger={true}
             />
             {/* Header - Compact on mobile */}
             <header className="mb-3 md:mb-6">
@@ -617,7 +724,7 @@ export default function GamePage() {
                         )}
 
                         {/* Pause Button */}
-                        {isAdmin && room?.status === 'playing' && (
+                        {room?.status === 'playing' && (
                             <button
                                 onClick={handlePauseGame}
                                 className={`px-2 md:px-3 py-1 md:py-2 rounded-lg transition-all font-semibold text-xs md:text-sm flex items-center gap-1 ${room.is_paused
@@ -642,6 +749,17 @@ export default function GamePage() {
                                         <span className="hidden md:inline">Pause</span>
                                     </>
                                 )}
+                            </button>
+                        )}
+
+                        {isAdmin && room?.status === 'playing' && (
+                            <button
+                                onClick={handleEndGame}
+                                className="px-2 md:px-3 py-1 md:py-2 bg-purple-900/50 text-purple-200 border border-purple-800 rounded-lg hover:bg-purple-900 transition-all font-semibold text-xs md:text-sm flex items-center gap-1"
+                                title="End Game"
+                            >
+                                <span className="md:hidden font-bold">End</span>
+                                <span className="hidden md:inline">End Game</span>
                             </button>
                         )}
 
@@ -689,35 +807,42 @@ export default function GamePage() {
                 {/* Left Column - Order 2 on mobile */}
                 <div className="space-y-3 md:space-y-6 order-2 lg:order-none">
                     {/* Show Current Turn FIRST on mobile to give context */}
-                    {currentTurnPlayer && room && (
-                        <CurrentTurn
-                            player={currentTurnPlayer}
-                            room={room}
-                            onTimerExpired={handleTimerExpired}
-                        />
-                    )}
+                    {
+                        currentTurnPlayer && room && (
+                            <CurrentTurn
+                                player={currentTurnPlayer}
+                                room={room}
+                                onTimerExpired={handleTimerExpired}
+                            />
+                        )
+                    }
                     <LiveLeaderboard players={players} />
-                </div>
+                </div >
 
                 {/* Middle Column - Order 3 on mobile */}
-                <div className="order-3 lg:order-none">
+                < div className="order-3 lg:order-none" >
                     <RecentWords moves={moves} players={players} />
-                </div>
+                </div >
 
                 {/* Right Column - Order 1 on mobile (Input first) */}
                 <div className="space-y-3 md:space-y-6 order-1 lg:order-none">
-                    {/* In single-device mode, we submit as the current turn player */}
-                    {/* In multi-device mode, we submit as ourselves */}
-                    {(isSingleDevice ? currentTurnPlayer : currentPlayer) && (
-                        <SubmitWordForm
-                            roomCode={roomCode}
-                            playerId={(isSingleDevice && currentTurnPlayer?.id) || currentPlayer?.id || ''}
-                            hostId={isSingleDevice ? currentPlayer?.id : undefined}
-                            isMyTurn={isMyTurn}
-                            isSpectator={currentPlayer?.role === 'spectator'}
-                            isHost={isAdmin}
-                        />
-                    )}
+                    {room?.status === 'finished' ? (
+                        /* End Game View */
+                        renderEndGameView()
+                    ) : (
+                        /* Normal Game Play */
+                        (isSingleDevice ? currentTurnPlayer : currentPlayer) && (
+                            <SubmitWordForm
+                                roomCode={roomCode}
+                                playerId={(isSingleDevice && currentTurnPlayer?.id) || currentPlayer?.id || ''}
+                                hostId={isSingleDevice ? currentPlayer?.id : undefined}
+                                isMyTurn={isMyTurn}
+                                isSpectator={currentPlayer?.role === 'spectator'}
+                                isHost={isAdmin}
+                            />
+                        )
+                    )
+                    }
                 </div>
             </div>
 

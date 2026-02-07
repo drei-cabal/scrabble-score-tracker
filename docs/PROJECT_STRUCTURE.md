@@ -20,18 +20,20 @@ scrabble-game/
 │   └── globals.css              # Global styles
 │
 ├── 📂 components/               # React Components
-│   ├── ConfirmationModal.tsx   # Reusable modal
-│   ├── CurrentTurn.tsx          # Turn indicator
-│   ├── LiveLeaderboard.tsx      # Real-time leaderboard
-│   ├── PlayerStats.tsx          # Player statistics
-│   ├── RecentWords.tsx          # Move history
-│   └── SubmitWordForm.tsx       # Word submission
+│   ├── 📂 game/                 # Gameplay-specific components
+│   ├── 📂 modals/               # Modal and diagnostic components
+│   └── 📂 ui/                   # Global UI components
+│
+├── 📂 docs/                     # Project Documentation
+│   ├── GameMechanics.md
+│   └── ...
 │
 ├── 📂 lib/                      # Utilities & Config
 │   └── supabase.ts              # Supabase client + types
 │
 ├── 📂 database/                 # Database Schema
-│   └── schema.sql               # PostgreSQL schema
+│   ├── 📂 migrations/           # SQL migration files
+│   └── schema.sql               # PostgreSQL base schema
 │
 ├── 📂 public/                   # Static Assets
 │   └── icon.png                 # Favicon
@@ -86,6 +88,7 @@ scrabble-game/
 
 - **Add a new page**: Create folder in `app/` with `page.tsx`
 - **Add API endpoint**: Create folder in `app/api/` with `route.ts`
-- **Add component**: Create `.tsx` file in `components/`
-- **Modify database**: Edit `database/schema.sql`
+- **Add component**: Create `.tsx` file in appropriate `components/` subfolder
+- **Modify database**: Edit `database/schema.sql` or add to `database/migrations/`
 - **Change styles**: Edit `app/globals.css` or Tailwind config
+- **View docs**: Check `docs/` folder for feature details

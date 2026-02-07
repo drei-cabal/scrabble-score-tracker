@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import WordBuilder from './WordBuilder'
-import ConfirmationModal from './ConfirmationModal'
+import ConfirmationModal from '../modals/ConfirmationModal'
 import { TileData } from '@/lib/scoring'
 import { v4 as uuidv4 } from 'uuid'
 import { offlineQueue } from '@/lib/offlineQueue'
@@ -61,6 +61,7 @@ export default function SubmitWordForm({
         buttonText: '',
         isDanger: false
     })
+    const [isBingo, setIsBingo] = useState(false)
 
     const [isOffline, setIsOffline] = useState(false)
 
@@ -76,7 +77,7 @@ export default function SubmitWordForm({
         }
     }, [])
 
-    const turnTotal = turnWords.reduce((sum, w) => sum + w.points, 0)
+    const turnTotal = turnWords.reduce((sum, w) => sum + w.points, 0) + (isBingo ? 50 : 0)
 
     const handleAddWord = (word: string, points: number, tiles: TileData[]) => {
         setTurnWords([...turnWords, { id: uuidv4(), word, points, tiles }])
@@ -111,6 +112,7 @@ export default function SubmitWordForm({
             // Offline Mode: Queue the move
             offlineQueue.add('submit', payload)
             setTurnWords([])
+            setIsBingo(false)
             setSuccess('Offline: Move queued. It will sync when you reconnect.')
             setLoading(false)
             // Note: Game state won't update until sync, so turn won't advance visually
@@ -132,6 +134,7 @@ export default function SubmitWordForm({
             }
 
             setTurnWords([])
+            setIsBingo(false)
         } catch (err: any) {
             setError(err.message)
         } finally {
@@ -304,7 +307,19 @@ export default function SubmitWordForm({
                                 </div>
                             </div>
                         ))}
+
                     </div>
+
+                    <button
+                        onClick={() => setIsBingo(!isBingo)}
+                        className={`w-full mb-4 py-2 rounded-lg font-bold border-2 transition-all flex items-center justify-center gap-2 ${isBingo
+                            ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500'
+                            : 'bg-card border-dashed border-white/20 text-text-muted hover:border-yellow-500/50 hover:text-yellow-500'
+                            }`}
+                    >
+                        <span className="text-xl">{isBingo ? '✓' : '+'}</span>
+                        BINGO (ALL 7 TILES) +50 PTS
+                    </button>
 
                     <div className="flex items-center justify-between border-t border-white/10 pt-3 mb-4">
                         <span className="font-bold">Total Score</span>

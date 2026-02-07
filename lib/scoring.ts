@@ -56,9 +56,7 @@ export const calculateWordScore = (tiles: TileData[], wordMultipliers: string[])
 
     // 3. Bingo Bonus
     // Rule: "If a word length is exactly 7 letters..."
-    if (tiles.length === 7) {
-        sum += 50
-    }
+
 
     return sum
 }

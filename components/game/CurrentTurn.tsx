@@ -1,6 +1,6 @@
 import { Player, Room } from '@/lib/supabase'
 import TurnTimer from './TurnTimer'
-import ErrorBoundary from './ErrorBoundary'
+import ErrorBoundary from '../ui/ErrorBoundary'
 
 interface CurrentTurnProps {
     player: Player

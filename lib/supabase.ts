@@ -42,7 +42,7 @@ export interface Move {
     player_id: string
     word_played: string | null
     points_scored: number
-    move_type: 'word' | 'skip' | 'swap'
+    move_type: 'word' | 'skip' | 'swap' | 'end_game'
     created_at: string
 }
 

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import AboutModal from '@/components/AboutModal'
-import HowToUseModal from '@/components/HowToUseModal'
+import AboutModal from '@/components/modals/AboutModal'
+import HowToUseModal from '@/components/modals/HowToUseModal'
 
 export default function Home() {
     const [activeTab, setActiveTab] = useState<'join' | 'create' | 'reconnect'>('join')
