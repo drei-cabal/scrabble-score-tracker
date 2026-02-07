@@ -9,6 +9,34 @@ interface CurrentTurnProps {
 }
 
 export default function CurrentTurn({ player, room, onTimerExpired }: CurrentTurnProps) {
+    // Game Finished State
+    if (room.status === 'finished') {
+        return (
+            <div className="relative overflow-hidden rounded-lg p-3 md:p-6 bg-gradient-to-br from-emerald-600 to-teal-700 shadow-lg">
+                {/* Check Icon */}
+                <div className="flex justify-center mb-1 md:mb-2">
+                    <svg className="w-8 h-8 md:w-12 md:h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+
+                {/* Text */}
+                <div className="text-center">
+                    <p className="text-xs md:text-sm font-semibold text-white uppercase tracking-wider mb-1 md:mb-2">
+                        Status
+                    </p>
+                    <p className="text-xl md:text-3xl font-bold text-white inline-block pb-0.5 md:pb-1">
+                        Game Finished
+                    </p>
+                </div>
+
+                {/* Decorative gradient overlay */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-16 -mt-16"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white opacity-10 rounded-full -ml-12 -mb-12"></div>
+            </div>
+        )
+    }
+
     return (
         <div className="relative overflow-hidden rounded-lg p-3 md:p-6 bg-gradient-primary shadow-lg">
             {/* Crown Icon */}
